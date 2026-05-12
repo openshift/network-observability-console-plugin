@@ -12,7 +12,7 @@ describe('Network_Observability FlowCollector status error scenario', { tags: ['
         Operator.createFlowcollector("LokiWithoutLokiStack")
     })
 
-    it("(OCP-88744, kapjain, Network_Observability) Verify error status when Loki enabled without LokiStack", function () {
+    it("(OCP-88744, kapjain) Verify error status when Loki enabled without LokiStack", function () {
         // Visit status page and wait for Ready condition to show False (error state)
         flowcollectorStatusPage.visit()
         cy.get(flowcollectorStatusSelectors.readyRow, { timeout: 120000 }).should('exist')

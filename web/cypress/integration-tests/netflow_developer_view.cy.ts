@@ -24,13 +24,13 @@ describe.skip('NetObserv developer view', { tags: ['Network_Observability'] }, f
         Operator.createFlowcollector()
     })
 
-    it("(OCP-75874, aramesha, Network_Observability) should verify developer view - Loki DataSource", function () {
+    it("(OCP-75874, aramesha) should verify developer view - Loki DataSource", function () {
         // verify Netflow traffic tab
         netflowPage.visit()
         cy.checkNetflowTraffic()
     })
 
-    it("(OCP-75874, OCP-73876 aramesha, Network_Observability) should verify developer view - Prom DataSource", function () {
+    it("(OCP-75874, OCP-73876 aramesha) should verify developer view - Prom DataSource", function () {
         // Deploy flowcollector with Loki disabled
         Operator.createFlowcollector("LokiDisabled")
 

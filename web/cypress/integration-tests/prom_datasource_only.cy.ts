@@ -1,7 +1,7 @@
 import { netflowPage } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
-describe('(OCP-74049, OCP-73875 Network_Observability) Prometheus datasource only', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-74049, OCP-73875) Prometheus datasource only', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -11,7 +11,7 @@ describe('(OCP-74049, OCP-73875 Network_Observability) Prometheus datasource onl
         Operator.createFlowcollector("LokiDisabled")
     })
 
-    it('(OCP-74049, aramesha, Network_Observability), Verify Prom dataSource in Administrator view as cluster-admin user', function () {
+    it('(OCP-74049, aramesha), Verify Prom dataSource in Administrator view as cluster-admin user', function () {
         netflowPage.visit()
 
         cy.checkNetflowTraffic("Disabled")

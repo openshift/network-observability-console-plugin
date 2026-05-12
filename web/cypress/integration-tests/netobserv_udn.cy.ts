@@ -1,6 +1,6 @@
-import { colSelectors, filterSelectors, netflowPage, setupTopologyViewWithNamespaceFilter, topologyPage, topologySelectors } from "@views/netflow-page"
+import { colSelectors, filterSelectors, netflowPage, topologyPage, topologySelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
-describe('(OCP-81751 Network_Observability) UDN test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-81751) UDN test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -31,7 +31,7 @@ describe('(OCP-81751 Network_Observability) UDN test', { tags: ['Network_Observa
     })
 
     it("(OCP-81751, aramesha) should verify network scope", function () {
-        setupTopologyViewWithNamespaceFilter()
+        topologyPage.setupWithNamespaceFilter()
 
         const scope = 'network'
         topologyPage.selectScopeGroup(scope)

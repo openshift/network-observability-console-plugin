@@ -33,11 +33,6 @@ export const graphSelector = {
     graphBody: '[role="region"]'
 }
 
-export const appsInfra = [
-    "applications-chart",
-    "infrastructure-chart"
-]
-
 Cypress.Commands.add('checkDashboards', (names) => {
     for (let i = 0; i < names.length; i++) {
         // Wait for panel to exist

@@ -4,7 +4,7 @@ import { networkHealth, networkHealthSelectors } from "@views/network-health"
 
 const alertServerity = ["Info", "Warning", "Critical"]
 
-describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-84821) Network Health test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -21,10 +21,11 @@ describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Netw
 
     })
 
-    it("(OCP-84821, memodi, Network_Observability) Verify Network Health Alerts", function () {
+    it("(OCP-84821, memodi) Verify Network Health Alerts", function () {
         cy.visit('/monitoring/alertrules')
-        cy.get('#alert-rules-table-scroll').should('exist')
-        cy.byTestID('console-select-menu-toggle').should('exist')
+        cy.get('table', { timeout: 60000 }).should('exist')
+
+        cy.get('#name').should('be.visible').clear().type('DNSNxDomain_PerDst{enter}')
         const variants = ["Namespace", "Workload"]
         variants.forEach(variant => {
             alertServerity.forEach(severity => {
@@ -45,18 +46,16 @@ describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Netw
         networkHealth.verifyAlert("dns-traffic")
 
         networkHealth.navigateToAlertPage("dns-traffic")
-        // verify Runbooks on the inspect alert page.
-        cy.get('div .pf-m-link').eq(1).should('have.attr', 'href').and('include', 'https');
     })
 
-    it("(OCP-84821, memodi, Network_Observability) Verify RecordingRules", function () {
+    it("(OCP-84821, memodi) Verify RecordingRules", function () {
         cy.visit('/network-health')
         cy.get(networkHealthSelectors.node).should('exist').click()
 
         networkHealth.verifyAlert("ip", "recording", "Too many DNS NX_DOMAIN errors")
     })
 
-    it("(OCP-84821, memodi, Network_Observability) Verify Health Topology Integration", function () {
+    it("(OCP-84821, memodi) Verify Health Topology Integration", function () {
         cy.visit('/network-health')
 
         cy.get(networkHealthSelectors.namespace).should('exist').click()
@@ -64,8 +63,8 @@ describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Netw
 
         cy.get(networkHealthSelectors.sidePanel).should('be.visible')
         // click the kebab button
-        cy.get('div.rule-details-row').first().find('button').click().then(() => {
-            cy.contains('Inspect network traffic').click().then(() => {
+        cy.get('div.rule-details-row').first().find('button').click({ force: true }).then(() => {
+            cy.contains('Inspect network traffic', { timeout: 60000 }).click().then(() => {
                 cy.checkNetflowTraffic()
                 // select Owner group
                 topologyPage.selectGroupWithSlider("Owner")

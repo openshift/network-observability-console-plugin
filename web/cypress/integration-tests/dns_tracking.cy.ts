@@ -1,7 +1,7 @@
 import { colSelectors, filterSelectors, netflowPage, overviewSelectors, querySumSelectors } from "@views/netflow-page"
 import { Operator, project } from "@views/netobserv"
 
-describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-67087) DNSTracking test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -16,7 +16,7 @@ describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network
         netflowPage.visit()
     })
 
-    it("(OCP-67087, aramesha, Network_Observability) Verify DNSTracking panels and Query Summary", function () {
+    it("(OCP-67087, aramesha) Verify DNSTracking panels and Query Summary", function () {
         // verify default DNSTracking panels are visible
         cy.checkPanel(overviewSelectors.defaultDNSTrackingPanels)
         cy.checkPanelsNum(6);

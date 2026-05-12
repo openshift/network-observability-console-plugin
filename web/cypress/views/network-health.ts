@@ -19,7 +19,7 @@ export const networkHealth = {
             if (alertText) {
                 cy.contains(alertText).should('exist')
             }
-            cy.get(`[data-test^="health-card-${name}"]`).eq(0).find('button').click()
+            cy.get(`[data-test^="health-card-${name}"]`).eq(0).find('button').click({ force: true })
             cy.get(networkHealthSelectors.sidePanel).should('not.exist')
         })
     },
@@ -27,6 +27,9 @@ export const networkHealth = {
         networkHealth.clickOnAlert(name)
         cy.get(networkHealthSelectors.sidePanel).should('be.visible').then(() => {
             cy.get('button[aria-label="Kebab toggle"]').first().click().then(() => {
+                // verify Runbooks
+                cy.contains('View runbook').should('have.attr', 'href').and('include', 'https');
+                // Inspect alert
                 cy.contains('Inspect alert').click().then(() => {
                     cy.byTestID('empty-box').should('not.exist')
                 })
@@ -38,7 +41,7 @@ export const networkHealth = {
         cy.get(networkHealthSelectors.sidePanel).should('be.visible').then(() => {
             cy.get('button[aria-label="Kebab toggle"]').first().click().then(() => {
                 cy.contains('Inspect network traffic').click().then(() => {
-
+                
                 })
             })
         })

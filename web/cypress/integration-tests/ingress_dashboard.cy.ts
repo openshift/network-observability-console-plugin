@@ -41,7 +41,7 @@ describe('Network_Observability networking dashboards tests', { tags: ['Network_
         cy.wait(1000)
     })
 
-    it('(OCP-69946, aramesha, Network_Observability), should have ingress operator dashboards', function () {
+    it('(OCP-69946, aramesha), should have ingress operator dashboards', function () {
         // verify that 'Current Total Incoming Bandwidth', 'Current Total Outgoing Bandwidth', 'HTTP Error Rate' and 'HTTP Server Average Response Latency' panels exist and are populated
         cy.checkDashboards(ingressPanels)
 

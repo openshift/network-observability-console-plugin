@@ -1,7 +1,7 @@
 import { colSelectors, filterSelectors, genSelectors, histogramSelectors, netflowPage } from "@views/netflow-page"
 import { Operator, project } from "@views/netobserv"
 
-describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Netflow Table view tests', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table view tests', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -18,7 +18,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         cy.byTestID("table-composable").should('exist')
     })
 
-    it("(OCP-50532, memodi, Network_Observability) should validate netflow table features", { tags: ['@netobserv-critical'] }, function () {
+    it("(OCP-50532, memodi) should validate netflow table features", { tags: ['@netobserv-critical'] }, function () {
         cy.byTestID(genSelectors.timeDrop).then(btn => {
             expect(btn).to.exist
             cy.wrap(btn).click().then(drop => {
@@ -53,7 +53,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         cy.byTestID("show-view-options-button").should('exist').click()
     })
 
-    it("(OCP-50532, memodi, Network_Observability) should validate columns", { tags: ['e2e', 'admin'] }, function () {
+    it("(OCP-50532, memodi) should validate columns", { tags: ['e2e', 'admin'] }, function () {
         netflowPage.stopAutoRefresh()
         cy.openColumnsModal().then(col => {
             cy.get(colSelectors.columnsModal).should('be.visible')
@@ -101,7 +101,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         })
     })
 
-    it("(OCP-50532, memodi, Network_Observability) should validate filters", { tags: ['@netobserv-critical'] }, function () {
+    it("(OCP-50532, memodi) should validate filters", { tags: ['@netobserv-critical'] }, function () {
         netflowPage.stopAutoRefresh()
 
         // verify Source namespace filter
@@ -164,7 +164,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         cy.get('#filters').should('not.exist')
     })
 
-    it("(OCP-50531, memodi, Network_Observability) should validate localstorage for plugin", { tags: ['e2e', 'admin'] }, function () {
+    it("(OCP-50531, memodi) should validate localstorage for plugin", { tags: ['e2e', 'admin'] }, function () {
         // select compact column size
         cy.byTestID("show-view-options-button").should('exist').click().then(views => {
             cy.contains('Display options').should('exist').click()
@@ -191,12 +191,12 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         })
     })
 
-    it("(OCP-59408, memodi, Network_Observability) should verify histogram", function () {
+    it("(OCP-59408, memodi) should verify histogram", function () {
         cy.get('#time-range-dropdown-dropdown').should('exist').click().byTestID("5m").should('exist').click()
         cy.byTestID("show-histogram-button").should('exist').click()
-        cy.get('#popover-netobserv-tour-popover-body').should('exist')
+        cy.get('#popover-netobserv-tour-popover-body', { timeout: 30000 }).should('exist')
         // close tour
-        cy.get(".guided-tour-close-button").should("exist").click()
+        cy.get(".guided-tour-close-button", { timeout: 30000 }).should("exist").click()
         cy.byTestID(genSelectors.refreshDrop).should('be.disabled')
         // get current refreshed time
         let lastRefresh = Cypress.$("#lastRefresh").text()

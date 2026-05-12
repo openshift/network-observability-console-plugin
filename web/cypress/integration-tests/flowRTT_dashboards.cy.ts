@@ -20,7 +20,7 @@ const flowRTTPanels = [
     "top-p99-srtt-per-infra-workload-(ms)-chart"
 ]
 
-describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -31,7 +31,7 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
         Operator.createFlowcollector("FlowRTT")
     })
 
-    it("(OCP-68246, aramesha, Network_Observability) Validate flowRTT edge labels and Query Summary stats", function () {
+    it("(OCP-68246, aramesha) Validate flowRTT edge labels and Query Summary stats", function () {
         netflowPage.visit()
         cy.get('#tabs-container').contains('Topology').click()
         cy.get('#drawer').should('not.be.empty')
@@ -67,7 +67,7 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
         netflowPage.resetClearFilters()
     })
 
-    it("(OCP-68246, aramesha, Network_Observability) Validate flowRTT dashboards", function () {
+    it("(OCP-68246, aramesha) Validate flowRTT dashboards", function () {
         // navigate to 'NetObserv / Main' Dashboard page
         dashboard.visit()
         dashboard.visitDashboard("netobserv-main")

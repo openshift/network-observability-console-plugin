@@ -5,7 +5,7 @@ function getPacketDropURL(drop: string): string {
     return `**/netflow-traffic**packetLoss=${drop}`
 }
 
-describe('(OCP-66141 Network_Observability) PacketDrop test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -20,7 +20,7 @@ describe('(OCP-66141 Network_Observability) PacketDrop test', { tags: ['Network_
         netflowPage.visit()
     })
 
-    it("(OCP-66141, aramesha, Network_Observability) Verify packetDrop panels", function () {
+    it("(OCP-66141, aramesha) Verify packetDrop panels", function () {
         // verify default PacketDrop panels are visible
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
         cy.checkPanelsNum(6);
@@ -45,7 +45,7 @@ describe('(OCP-66141 Network_Observability) PacketDrop test', { tags: ['Network_
         cy.checkPanelsNum(6);
     })
 
-    it("(OCP-66141, aramesha, Network_Observability) Verify packetDrop Query Options filters", function () {
+    it("(OCP-66141, aramesha) Verify packetDrop Query Options filters", function () {
         cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('exist')
 

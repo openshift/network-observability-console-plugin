@@ -1,8 +1,8 @@
-import { netflowPage, setupTopologyViewWithNamespaceFilter, topologyPage, topologySelectors } from "@views/netflow-page"
+import { netflowPage, topologyPage, topologySelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 import { verifyResourceSVGLogo } from "@views/netobserv-logo"
 
-describe("(OCP-87215, Network_Observability) Verify Gateway API three-level owner metadata UI Test", { tags: ['Network_Observability'] }, function () {
+describe("(OCP-87215) Gateway API owner metadata", { tags: ['Network_Observability'] }, function () {
     const gatewayNS = 'netobserv-gateway-test'
     const gatewayName = 'test-gateway-owner'
     before('any test', function () {
@@ -14,13 +14,18 @@ describe("(OCP-87215, Network_Observability) Verify Gateway API three-level owne
         Operator.createFlowcollector("FlowRTT")
 
         cy.adminCLI('oc apply -f cypress/fixtures/gateway-api.yaml')
+
+        // Wait for pods to be ready
+        cy.wait(5000)
+        cy.adminCLI('oc wait --for=condition=Ready pod -l app=traffic-generator -n netobserv-gateway-test --timeout=120s')
+        cy.adminCLI('oc wait --for=condition=Ready pod -l app=echo-server -n netobserv-gateway-test --timeout=120s')
     })
 
     beforeEach("navigate to topology view", function () {
-        setupTopologyViewWithNamespaceFilter(gatewayNS)
+        topologyPage.setupWithNamespaceFilter(gatewayNS)
     })
 
-    it("(OCP-87215, kapjain, Network_Observability) should verify Gateway appears as owner-level topology node with logo", function () {
+    it("(OCP-87215, kapjain) Gateway owner logo", function () {
         topologyPage.selectScopeGroup("owner")
         topologyPage.isViewRendered()
 

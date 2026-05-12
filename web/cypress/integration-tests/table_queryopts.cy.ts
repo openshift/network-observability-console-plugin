@@ -5,7 +5,7 @@ function getTableLimitURL(limit: string): string {
     return `**/netflow-traffic**limit=${limit}`
 }
 
-describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Netflow Table Query Options', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table Query Options', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -22,7 +22,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         cy.byTestID("table-composable").should('exist')
     })
 
-    it("(OCP-50532, aramesha, Network_Observability) should verify Query Options dropdown", { tags: ['@smoke'] }, function () {
+    it("(OCP-50532, aramesha) should verify Query Options dropdown", { tags: ['@smoke'] }, function () {
         // toggle between the page limits
         cy.changeQueryOption('500')
         netflowPage.waitForLokiQuery()
@@ -43,7 +43,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         }).as('matchedUrl')
     })
 
-    it("(OCP-50532, memodi, Network_Observability) should validate query summary panel", { tags: ['@smoke'] }, function () {
+    it("(OCP-50532, memodi) should validate query summary panel", { tags: ['@smoke'] }, function () {
         let warningExists = false
         cy.get(querySumSelectors.queryStatsPanel).should('exist').then(qrySum => {
             if (Cypress.$(querySumSelectors.queryStatsPanel + ' svg.query-summary-warning').length > 0) {
@@ -82,7 +82,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         cy.contains('Date').should('exist')
     })
 
-    it("(OCP-68125, aramesha, Network_Observability) should verify DSCP column", function () {
+    it("(OCP-68125, aramesha) should verify DSCP column", function () {
         netflowPage.stopAutoRefresh()
         cy.openColumnsModal().then(col => {
             cy.get(colSelectors.columnsModal).should('be.visible')

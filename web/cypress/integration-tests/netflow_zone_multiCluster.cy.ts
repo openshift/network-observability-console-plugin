@@ -1,4 +1,4 @@
-import { colSelectors, netflowPage, setupTopologyViewWithNamespaceFilter, topologyPage, topologySelectors, getTopologyScopeURL } from "@views/netflow-page"
+import { colSelectors, netflowPage, topologyPage, topologySelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
 describe('Netflow Zone and multiCluster test', { tags: ['Network_Observability'] }, function () {
@@ -16,7 +16,7 @@ describe('Netflow Zone and multiCluster test', { tags: ['Network_Observability']
         netflowPage.visit()
     })
 
-    it("(OCP-71525, aramesha, Network_Observability) should validate zone/multiCluster columns", function () {
+    it("(OCP-71525, aramesha) should validate zone/multiCluster columns", function () {
         cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('exist')
 
@@ -41,11 +41,11 @@ describe('Netflow Zone and multiCluster test', { tags: ['Network_Observability']
         })
     })
 
-    it("(OCP-71524, aramesha, Network_Observability) should verify zone/cluster scope topology", function () {
-        setupTopologyViewWithNamespaceFilter()
+    it("(OCP-71524, aramesha) should verify zone/cluster scope topology", function () {
+        topologyPage.setupWithNamespaceFilter()
         // Verify Zone scope
         var scope = "zone"
-        cy.intercept('GET', getTopologyScopeURL(scope), {
+        cy.intercept('GET', topologyPage.getScopeURL(scope), {
             fixture: 'flowmetrics/zone.json'
         }).as('matchedUrl')
 
@@ -61,7 +61,7 @@ describe('Netflow Zone and multiCluster test', { tags: ['Network_Observability']
 
         // Verify Cluster scope
         scope = "cluster"
-        cy.intercept('GET', getTopologyScopeURL(scope), {
+        cy.intercept('GET', topologyPage.getScopeURL(scope), {
             fixture: 'flowmetrics/cluster.json'
         }).as('matchedUrl')
 

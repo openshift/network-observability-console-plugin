@@ -49,7 +49,7 @@ describe('Network_Observability health dashboards tests', { tags: ['Network_Obse
         Operator.createFlowcollector("BytesMetrics")
     })
 
-    it('(OCP-61893, memodi, Network_Observability), should have health dashboards', function () {
+    it('(OCP-61893, memodi), should have health dashboards', function () {
         // navigate to 'NetObserv / Health' Dashboard page
         // all health panels are visible with default metrics
         dashboard.visit()

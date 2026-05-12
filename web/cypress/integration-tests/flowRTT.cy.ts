@@ -1,7 +1,7 @@
 import { colSelectors, netflowPage, overviewSelectors, querySumSelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
-describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -16,7 +16,7 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
         netflowPage.visit()
     })
 
-    it("(OCP-68246, aramesha, Network_Observability) Verify flowRTT panels", function () {
+    it("(OCP-68246, aramesha) Verify flowRTT panels", function () {
         // verify default flowRTT panels are visible
         cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
         cy.checkPanelsNum(5);
@@ -48,7 +48,7 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
         })
     })
 
-    it("(OCP-68246, aramesha, Network_Observability) Verify default flowRTT column", function () {
+    it("(OCP-68246, aramesha) Verify default flowRTT column", function () {
         cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('exist')
         netflowPage.stopAutoRefresh()

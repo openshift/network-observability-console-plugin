@@ -3,7 +3,7 @@ import { Operator } from "@views/netobserv"
 import {flowcollectorStatusPage, flowcollectorStatusSelectors} from "@views/flowcollector-status";
 import {searchPage} from "@views/search";
 
-describe('(OCP-84156 OCP-88744 Network_Observability) StaticPlugin test with Status Check', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -14,7 +14,7 @@ describe('(OCP-84156 OCP-88744 Network_Observability) StaticPlugin test with Sta
         Operator.createFlowcollector("StaticPlugin")
     })
 
-    it("(OCP-84156, OCP-88744 aramesha, Network_Observability) Edit flowcollector form view with Status Check", function () {
+    it("(OCP-84156, OCP-88744 aramesha) Edit flowcollector form view with Status Check", function () {
         // Edit flowcollector form view to update sampling to 1
         flowcollectorStatusPage.visit()
 
@@ -80,7 +80,7 @@ describe('(OCP-84156 OCP-88744 Network_Observability) StaticPlugin test with Sta
         netflowPage.resetClearFilters()
     })
 
-        it("(OCP-88744, kapjain, Network_Observability) Verify status indicator on Network Health page", function () {
+        it("(OCP-88744, kapjain) Verify status indicator on Network Health page", function () {
             cy.visit('/network-health')
 
             // cy.get('#content-scrollable', { timeout: 30000 }).should('exist')
@@ -92,7 +92,7 @@ describe('(OCP-84156 OCP-88744 Network_Observability) StaticPlugin test with Sta
             cy.contains('Network Observability FlowCollector status', { timeout: 30000 }).should('exist')
         })
 
-        it("(OCP-88744, kapjain, Network_Observability) Verify status indicator on Network Traffic page", function () {
+        it("(OCP-88744, kapjain) Verify status indicator on Network Traffic page", function () {
             cy.visit('/netflow-traffic')
 
             // cy.get('#overview-container', { timeout: 60000 }).should('exist')
@@ -104,7 +104,7 @@ describe('(OCP-84156 OCP-88744 Network_Observability) StaticPlugin test with Sta
             cy.contains('Network Observability FlowCollector status', { timeout: 30000 }).should('exist')
         })
 
-        it("(OCP-88744, kapjain, Network_Observability) Verify FlowCollector status via search and cluster columns", function () {
+        it("(OCP-88744, kapjain) Verify FlowCollector status via search and cluster columns", function () {
             // Search for FlowCollector via search page
             searchPage.navToSearchPage()
             searchPage.chooseResourceType('FlowCollector')

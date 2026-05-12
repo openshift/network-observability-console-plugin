@@ -1,4 +1,4 @@
-import { netflowPage, loadTimes, memoryUsage, overviewSelectors, getTopologyScopeURL, getMemoryUsageMB } from "@views/netflow-page"
+import { netflowPage, loadTimes, memoryUsage, overviewSelectors, topologyPage, getMemoryUsageMB } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
 describe("(OCP-67725, memodi) Network_Observability Client Performances", { browser: 'chrome', tags: ['Performance'] }, function () {
@@ -20,13 +20,13 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
 
     })
 
-    it("(OCP-67725, memodi, Network_Observability) should measure overview page load times", function () {
+    it("(OCP-67725, memodi) should measure overview page load times", function () {
         netflowPage.clearAllFilters()
         const start = performance.now()
-        cy.intercept('GET', getTopologyScopeURL("namespace"), {
+        cy.intercept('GET', topologyPage.getScopeURL("namespace"), {
             fixture: 'perf/overview_perf_ns.json'
         })
-        cy.intercept('GET', getTopologyScopeURL("app"), {
+        cy.intercept('GET', topologyPage.getScopeURL("app"), {
             fixture: 'perf/overview_perf_app.json'
         })
 
@@ -44,7 +44,7 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
         })
     })
 
-    it("(OCP-67725, memodi, Network_Observability) should measure table page load times", function () {
+    it("(OCP-67725, memodi) should measure table page load times", function () {
         cy.get('#tabs-container').contains('Traffic flows').click()
         netflowPage.clearAllFilters()
         const start = performance.now()
@@ -66,14 +66,14 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
         })
     })
 
-    it("(OCP-67725, memodi, Network_Observability) should measure topology page load times", function () {
+    it("(OCP-67725, memodi) should measure topology page load times", function () {
         cy.get('#tabs-container').contains('Topology').click()
         netflowPage.clearAllFilters()
         const start = performance.now()
-        cy.intercept('GET', getTopologyScopeURL("namespace"), {
+        cy.intercept('GET', topologyPage.getScopeURL("namespace"), {
             fixture: 'perf/flow_metrics_perf.json'
         })
-        cy.get('[data-surface="true"]').should('be.visible').then(() => {
+        cy.get('[data-surface=true][transform="translate(0, 0) scale(1)"]', { timeout: 10000 }).should('exist').then(() => {
             cy.wrap(performance.now()).then(end => {
                 let pageload = Math.round(end - start)
                 let curMemoryUsage = getMemoryUsageMB()

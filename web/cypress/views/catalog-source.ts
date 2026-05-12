@@ -1,7 +1,7 @@
 export const catalogSources = {
     navToOperatorHubSources: () => {
         cy.visit('k8s/cluster/config.openshift.io~v1~OperatorHub/cluster/sources')
-        cy.get('#yaml-create').should('exist')
+        cy.get('div.loading-box__loaded', { timeout: 30000 }).should('exist')
     },
     getOCPVersion: () => {
         let cmd = `oc version -o json --kubeconfig=${Cypress.env('KUBECONFIG_PATH')} | grep openshiftVersion | awk -F'"' '{print $4}' | awk -F'.' '{print $1"."$2}' `

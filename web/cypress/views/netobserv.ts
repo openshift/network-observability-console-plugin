@@ -58,7 +58,7 @@ const FIXTURE_PATHS = {
 
 export const Operator = {
     name: () => {
-        if (`${Cypress.env('NOO_CATALOG_SOURCE')}` == "upstream") {
+        if (`${Cypress.env('NOO_CATALOG_SOURCE')}` === "upstream") {
             return "NetObserv Operator"
         }
         else {
@@ -70,7 +70,7 @@ export const Operator = {
         let catalogImg: string
         let catalogSource: string
 
-        if (catSrc == "upstream") {
+        if (catSrc === "upstream") {
             catalogImg = catSrcImage ? catSrcImage : DEFAULT_UPSTREAM_IMAGE
             catalogSource = "netobserv-test"
             catalogDisplayName = "NetObserv QE"
@@ -124,23 +124,26 @@ export const Operator = {
     visitFlowcollector: () => {
         cy.visit('k8s/ns/openshift-netobserv-operator/operators.coreos.com~v1alpha1~ClusterServiceVersion')
         const selector = '[data-test-operator-row="' + Operator.name() + '"]'
-        cy.get(selector).invoke('attr', 'href').then(href => {
-            if (href) {
-                cy.visit(href)
-            }
-        })
 
-        cy.contains('Flow Collector').invoke('attr', 'href').then(href => {
-            if (href) {
-                cy.visit(href)
-            }
-        })
+        cy.get(selector, { timeout: 30000 })
+            .should('exist')
+            .then($el => {
+                const href = $el.attr('href')
+                cy.visit(href as string)
+            })
+
+        cy.contains('Flow Collector')
+            .should('exist')
+            .then($el => {
+                const href = $el.attr('href')
+                cy.visit(href as string)
+            })
     },
     createFlowcollector: (parameters?: FlowCollectorParameter) => {
         Operator.visitFlowcollector()
         cy.get('div.loading-box__loaded').should('exist')
         cy.wait(3000)
-        cy.get("#yaml-create").should('exist').then(() => {
+        cy.get("#yaml-create", { timeout: 60000 }).should('exist').then(() => {
             if ((Cypress.$('td[role="gridcell"]').length > 0) && (parameters != null)) {
                 Operator.deleteFlowCollector()
                 // come back to flowcollector tab after deletion
@@ -207,15 +210,22 @@ export const Operator = {
                 if (parameters !== "LokiDisabled" && parameters !== "LokiWithoutLokiStack") {
                     cy.adminCLI(`oc wait --for=condition=Ready pod -l app=loki -n ${project} --timeout=180s`)
                 }
+
+                Operator.visitFlowcollector()
+                // Wait for page to stabilize after navigation
+                cy.get('div.loading-box__loaded', { timeout: 30000 }).should('exist')
+
                 if (parameters !== "LokiWithoutLokiStack") {
-                    Operator.visitFlowcollector()
-                    cy.byTestID('status-text', { timeout: 120000 }).should('exist').should('contain.text', 'Ready')
+                    // Check status in the FlowCollector 'cluster' row specifically
+                    cy.contains('tr', 'cluster').within(() => {
+                        cy.byTestID('status-text', { timeout: 60000 }).should('contain.text', 'Ready')
+                    })
                 }
             }
         })
     },
     deployFlowcollectorFromUI: () => {
-        cy.byTestID('item-create').should('exist').click()
+        cy.byTestID('item-create').should('exist').click({ force: true })
         // Overview tab
         cy.get(pluginSelectors.next).should('exist').click()
         // Processing tab
@@ -263,7 +273,7 @@ Cypress.Commands.add('checkStorageClass', (context: Mocha.Context) => {
     let storageClassCheck = false
     const kubeconfig = Cypress.env('KUBECONFIG_PATH');
     expect(kubeconfig, 'KUBECONFIG_PATH').to.be.a('string').and.not.be.empty
-    cy.exec(`oc get sc --kubeconfig ${kubeconfig}`).then(result => {
+    cy.exec(`oc get sc --kubeconfig ${JSON.stringify(kubeconfig)}`).then(result => {
         if (result.stderr.includes('No resources found')) {
             cy.log('StorageClass not deployed, skipping')
             storageClassCheck = true

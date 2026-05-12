@@ -8,14 +8,9 @@
  * @param timeout - Timeout in milliseconds (default: 60000)
  */
 export function verifyResourceSVGLogo(resourceType: string, resourceName: string, timeout: number = 60000) {
-    cy.get(`g[data-id*="o=${resourceType}.${resourceName}"]`, { timeout }).then($nodes => {
-        const nodesWithSvg = $nodes.filter((i, el) => {
-            return Cypress.$(el).find('svg').length > 0
-        })
-
-        cy.wrap(nodesWithSvg).should('have.length.greaterThan', 0)
-        cy.wrap(nodesWithSvg).first().should('be.visible').within(() => {
-            cy.get('svg').should('exist').and('be.visible')
-        })
-    })
+    const selector = `g[data-id*="o=${resourceType}.${resourceName}"]`;
+    cy.get(`${selector} svg`, { timeout })
+      .should('have.length.greaterThan', 0)
+      .first()
+      .should('be.visible');
 }

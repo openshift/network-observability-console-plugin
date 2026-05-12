@@ -29,7 +29,7 @@ describe('Network_Observability flow dashboards tests', { tags: ['Network_Observ
         Operator.createFlowcollector("PacketsMetrics")
     })
 
-    it("(OCP-63790, memodi, Network_Observability), should have flow dashboards for packets metrics", function () {
+    it("(OCP-63790, memodi), should have flow dashboards for packets metrics", function () {
         // navigate to 'NetObserv / Main' Dashboard page
         dashboard.visit()
         dashboard.visitDashboard("netobserv-main")

@@ -1,7 +1,7 @@
 import { Operator, project } from "@views/netobserv"
 import { netflowPage } from "@views/netflow-page"
 
-describe('(OCP-72610 Network_Observability) Export automation', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-72610) Export automation', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -16,7 +16,7 @@ describe('(OCP-72610 Network_Observability) Export automation', { tags: ['Networ
         netflowPage.visit()
     })
 
-    it("(OCP-72610, aramesha, Network_Observability) should validate exporting panels", function () {
+    it("(OCP-72610, aramesha) should validate exporting panels", function () {
         // Export all overview panels
         cy.get('li.overviewTabButton').should('exist').click()
         netflowPage.stopAutoRefresh()
@@ -32,8 +32,8 @@ describe('(OCP-72610 Network_Observability) Export automation', { tags: ['Networ
         cy.exec('rm cypress/downloads/overview_panel_top_avg_byte_rates.png')
     })
 
-    it("(OCP-72610, aramesha, Network_Observability) should validate exporting table view", function () {
-        cy.get('li.tableTabButton').should('exist').click()
+    it("(OCP-72610, aramesha) should validate exporting table view", function () {
+        cy.get('#tabs-container').contains('Traffic flows').click()
         netflowPage.stopAutoRefresh()
         netflowPage.selectSourceNS(project)
         cy.byTestID("table-composable").should('exist')
@@ -44,18 +44,19 @@ describe('(OCP-72610 Network_Observability) Export automation', { tags: ['Networ
             cy.byTestID('export-button').should('exist').click()
         })
         // get the CSV file name with retry built into exec
-        cy.exec("ls cypress/downloads", { timeout: 10000 }).then((response) => {
-            // rename CSV file to export_table.csv
-            cy.wrap(response.stdout).should('not.be.empty')
-            cy.exec(`mv cypress/downloads/${response.stdout.trim()} cypress/downloads/export_table.csv`)
-            cy.readFile('cypress/downloads/export_table.csv')
+        cy.exec("ls cypress/downloads", { timeout: 15000 }).then((response) => {
+            const files = response.stdout.trim().split('\n').filter(f => f.endsWith('.csv'))
+            expect(files).to.have.length(1, 'Expected exactly one CSV file in downloads')
+            const csvFile = files[0]
+            cy.exec(`mv "cypress/downloads/${csvFile}" "cypress/downloads/export_table.csv"`)
+            cy.readFile('cypress/downloads/export_table.csv', { timeout: 10000 })
         })
         cy.exec('rm cypress/downloads/export_table.csv')
         netflowPage.clearAllFilters()
     })
 
-    it("(OCP-72610, aramesha, Network_Observability) should validate exporting topology view", function () {
-        cy.get('li.topologyTabButton').should('exist').click()
+    it("(OCP-72610, aramesha) should validate exporting topology view", function () {
+        cy.get('#tabs-container').contains('Topology').click()
         netflowPage.selectSourceNS(project)
         netflowPage.stopAutoRefresh()
         cy.get('#drawer').should('not.be.empty')

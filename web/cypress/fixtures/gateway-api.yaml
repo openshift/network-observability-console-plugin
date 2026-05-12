@@ -116,6 +116,6 @@ spec:
         - -c
         - |
           while true; do
-            curl -s http://test-gateway-owner-openshift-default.netobserv-gateway-test.svc.cluster.local:8080 || true
+            curl -s -H 'Host: gwapi.example.com' http://test-gateway-owner-openshift-default.netobserv-gateway-test.svc.cluster.local:8080 || true
             sleep 5
           done

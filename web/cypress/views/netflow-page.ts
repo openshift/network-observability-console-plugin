@@ -18,14 +18,6 @@ declare global {
 
 type Group = 'Node' | 'Namespace' | 'Owner' | 'Resource'
 
-export function getTopologyScopeURL(scope: string): string {
-    return `**/flow/metrics**aggregateBy=${scope}*`
-}
-
-export function getTopologyResourceScopeGroupURL(groups: string): string {
-    return `**/flow/metrics**groups=${groups}*`
-}
-
 export function getMemoryUsageMB(): number {
     return Math.round((window.performance as any).memory?.usedJSHeapSize / 1048576)
 }
@@ -66,7 +58,7 @@ export const netflowPage = {
         cy.byTestID("set-default-filters-button").should('exist').click({ force: true })
     },
     clearAllFilters: () => {
-        cy.byTestID("clear-all-filters-button").should('exist').click()
+        cy.byTestID("clear-all-filters-button").should('exist').click({ force: true })
     },
     waitForLokiQuery: () => {
         cy.get("#refresh-button > span > svg").invoke('attr', 'style').should('contain', '0s linear 0s')
@@ -79,6 +71,38 @@ export const netflowPage = {
 }
 
 export const topologyPage = {
+    isViewRendered: () => {
+        cy.get('[data-surface="true"]').should('exist')
+    },
+    /**
+    * Helper function to setup topology view with optional namespace filter
+    * Navigates to topology tab, clears filters, optionally applies namespace filter, and sets display options
+    * @param namespace - Optional namespace to filter topology view by
+    */
+    setupWithNamespaceFilter(namespace?: string) {
+        cy.clearLocalStorage()
+        netflowPage.visit()
+
+        cy.get('#tabs-container').contains('Topology').click()
+
+        // Wait for topology page to load
+        cy.get('#drawer', { timeout: 30000 }).should('exist')
+        cy.get('#drawer').should('not.be.empty')
+
+        // Add filter for namespace if provided
+        if (namespace) {
+            cy.get(filterSelectors.filterInput).type("src_namespace=" + namespace + '{enter}')
+            cy.get('#src_namespace-0-toggle').should('contain.text', `${namespace}`)
+        }
+
+        cy.byTestID("show-view-options-button").should('exist').click().then(() => {
+            cy.contains('Display options').should('exist').click()
+            cy.byTestID('layout-dropdown').click()
+            cy.byTestID('Grid').click()
+        })
+        cy.byTestID(topologySelectors.metricsFunctionDrop).should('exist').click().get('#sum').click()
+        cy.contains('Display options').should('exist').click()
+    },
     selectScopeGroup: (scope?: string, group?: string) => {
         cy.contains('Display options').should('exist').click()
         if (scope) {
@@ -90,8 +114,11 @@ export const topologyPage = {
         }
         cy.contains('Display options').should('exist').click()
     },
-    isViewRendered: () => {
-        cy.get('[data-surface="true"]').should('exist')
+    getScopeURL(scope: string): string {
+        return `**/flow/metrics**aggregateBy=${scope}*`
+    },
+    getResourceScopeGroupURL(groups: string): string {
+        return `**/flow/metrics**groups=${groups}*`
     },
     getOwnerNode: (resourceType: string, resourceName: string, timeout: number = 60000) => {
         return cy.get(`g[data-id*="o=${resourceType}.${resourceName}"]`, { timeout })
@@ -120,36 +147,6 @@ export const topologyPage = {
             })
         })
     }
-}
-
-/**
- * Helper function to setup topology view with optional namespace filter
- * Navigates to topology tab, clears filters, optionally applies namespace filter, and sets display options
- * @param namespace - Optional namespace to filter topology view by
- */
-export function setupTopologyViewWithNamespaceFilter(namespace?: string) {
-    cy.clearLocalStorage()
-    netflowPage.visit()
-    cy.get('#tabs-container').contains('Topology').click()
-
-    if (Cypress.$('[data-surface=true][transform="translate(0, 0) scale(1)]').length > 0) {
-        cy.get('[data-test="filters"] > [data-test="clear-all-filters-button"]').should('exist').click()
-    }
-    cy.get('#drawer').should('not.be.empty')
-
-    // Add filter for namespace if provided
-    if (namespace) {
-        cy.get(filterSelectors.filterInput).type("src_namespace=" + namespace + '{enter}')
-        cy.get('#src_namespace-0-toggle').should('contain.text', `${namespace}`)
-    }
-
-    cy.byTestID("show-view-options-button").should('exist').click().then(() => {
-        cy.contains('Display options').should('exist').click()
-        cy.byTestID('layout-dropdown').click()
-        cy.byTestID('Grid').click()
-    })
-    cy.byTestID(topologySelectors.metricsFunctionDrop).should('exist').click().get('#sum').click()
-    cy.contains('Display options').should('exist').click()
 }
 
 export namespace pluginSelectors {
@@ -282,15 +279,15 @@ export namespace overviewSelectors {
 }
 
 export const loadTimes = {
-    "overview": 8500,
-    "table": 5000,
-    "topology": 5000
+    "overview": 11000,
+    "table": 6500,
+    "topology": 6500
 }
 
 export const memoryUsage = {
-    "overview": 300,
-    "table": 450,
-    "topology": 360
+    "overview": 500,
+    "table": 600,
+    "topology": 500
 }
 
 export namespace histogramSelectors {

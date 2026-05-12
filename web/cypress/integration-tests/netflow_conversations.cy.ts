@@ -1,7 +1,7 @@
 import { Operator } from "@views/netobserv"
 import { netflowPage, colSelectors, querySumSelectors } from "@views/netflow-page"
 
-describe('(OCP-71787 Network_Observability) Conversation tracking test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-71787) Conversation tracking test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -18,14 +18,14 @@ describe('(OCP-71787 Network_Observability) Conversation tracking test', { tags:
         cy.byTestID("table-composable").should('exist')
     })
 
-    it("(OCP-71787, aramesha, Network_Observability) should validate default conversation tracking columns", function () {
+    it("(OCP-71787, aramesha) should validate default conversation tracking columns", function () {
         cy.byTestID('table-composable').should('exist').within(() => {
             cy.get(colSelectors.recordType).should('exist')
             cy.get(colSelectors.conversationID).should('exist')
         })
     })
 
-    it("(OCP-71787, aramesha, Network_Observability) should verify Query Summary panel", function () {
+    it("(OCP-71787, aramesha) should verify Query Summary panel", function () {
         cy.changeQueryOption('Conversation')
 
         // validate Query Summary panel
