@@ -23,7 +23,7 @@ const DNSPanels = [
     "dns-error-rate-per-infra-workload-chart"
 ]
 
-describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-67087) DNSTracking test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -34,9 +34,9 @@ describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network
         Operator.createFlowcollector("DNSTracking")
     })
 
-    it("(OCP-67087, aramesha, Network_Observability) Validate DNSLatencies edge label and Query Summary stats", function () {
+    it("(OCP-67087, aramesha) Validate DNSLatencies edge label and Query Summary stats", function () {
         netflowPage.visit()
-        cy.get('#tabs-container li:nth-child(3)').click()
+        cy.get('#tabs-container').contains('Topology').click()
         cy.get('#drawer').should('not.be.empty')
         cy.get(filterSelectors.filterInput).type("dns_latency>=0" + '{enter}')
 
@@ -56,7 +56,7 @@ describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network
         cy.byTestID("scope-dropdown").click().get("#host").click()
         cy.contains('Display options').should('exist').click()
 
-        cy.get('[data-test-id=edge-handler]').should('exist').each((g) => {
+        cy.byLegacyTestID('edge-handler').should('exist').each((g) => {
             expect(g.text()).to.match(/\d+\s*ms/);
         });
 
@@ -67,7 +67,7 @@ describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network
         netflowPage.clearAllFilters()
     })
 
-    it("(OCP-67087, aramesha, Network_Observability) Validate DNSTracking dashboards", function () {
+    it("(OCP-67087, aramesha) Validate DNSTracking dashboards", function () {
         // navigate to 'NetObserv / Main' Dashboard page
         dashboard.visit()
         dashboard.visitDashboard("netobserv-main")

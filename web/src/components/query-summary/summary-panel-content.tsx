@@ -81,6 +81,7 @@ export const SummaryPanelContent: React.FC<SummaryPanelContentProps> = ({
           }}
           id={id}
           isExpanded={expanded === id}
+          data-test={`query-summary-toggle-${id}`}
         >
           {label}
         </AccordionToggle>

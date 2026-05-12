@@ -1,11 +1,7 @@
-import { netflowPage, loadTimes, memoryUsage, overviewSelectors } from "@views/netflow-page"
+import { netflowPage, loadTimes, memoryUsage, overviewSelectors, getMemoryUsageMB, topologyPage } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
-function getTopologyScopeURL(scope: string): string {
-    return `**/flow/metrics?filters=&limit=50&recordType=flowLog&dedup=true&packetLoss=all&timeRange=300&rateInterval=30s&step=15s&type=bytes&aggregateBy=${scope}`
-}
-
-describe("(OCP-67725, memodi) Network_Observability Client Performances", { browser: 'chrome', tags: ['Performance'] }, function () {
+describe("(OCP-67725, memodi) Client Performances", { browser: 'chrome', tags: ['Performance'] }, function () {
     before("tests", function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
         cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
@@ -17,27 +13,26 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
 
     beforeEach("test", function () {
         cy.clearLocalStorage()
-        cy.intercept('**/backend/api/flow/metrics*').as('call1')
         cy.visit('/netflow-traffic')
-        // wait for all calls to complete
-        cy.wait('@call1', { timeout: 60000 })
-
+        // wait for page to be fully loaded
+        cy.get('#overview-container', { timeout: 60000 }).should('exist')
+        cy.byTestID('no-results-found').should('not.exist')
     })
 
-    it("(OCP-67725, memodi, Network_Observability) should measure overview page load times", function () {
+    it("(OCP-67725, memodi) should measure overview page load times", function () {
         netflowPage.clearAllFilters()
         const start = performance.now()
-        cy.intercept('GET', getTopologyScopeURL("namespace"), {
+        cy.intercept('GET', topologyPage.getScopeURL("namespace"), {
             fixture: 'perf/overview_perf_ns.json'
         })
-        cy.intercept('GET', getTopologyScopeURL("app"), {
+        cy.intercept('GET', topologyPage.getScopeURL("app"), {
             fixture: 'perf/overview_perf_app.json'
         })
 
         cy.get('#overview-flex').contains(overviewSelectors.defaultPanels[0]).should('be.visible').then(() => {
             cy.wrap(performance.now()).then(end => {
                 let pageload = Math.round(end - start)
-                let curMemoryUsage = Math.round(window.performance.memory.usedJSHeapSize / 1048576)
+                let curMemoryUsage = getMemoryUsageMB()
                 cy.log(`Overview page load took ${pageload} ms.`)
                 cy.log(`Overview page memory consumption ${curMemoryUsage} MB`)
                 let thresPageload = loadTimes.overview + loadTimes.overview * 0.5
@@ -48,18 +43,18 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
         })
     })
 
-    it("(OCP-67725, memodi, Network_Observability) should measure table page load times", function () {
-        cy.get('#tabs-container li:nth-child(2)').click()
+    it("(OCP-67725, memodi) should measure table page load times", function () {
+        cy.get('#tabs-container').contains('Traffic flows').click()
         netflowPage.clearAllFilters()
         const start = performance.now()
-        const url = '**/backend/api/flow/metrics*'
+        const url = '**/api/flow/metrics*'
         cy.intercept('GET', url, {
             fixture: 'perf/netflow_table_perf.json'
         })
         cy.byTestID("table-composable").should('be.visible').then(() => {
             cy.wrap(performance.now()).then(end => {
                 let pageload = Math.round(end - start)
-                let curMemoryUsage = Math.round(window.performance.memory.usedJSHeapSize / 1048576)
+                let curMemoryUsage = getMemoryUsageMB()
                 cy.log(`Table view page load took ${pageload} ms.`)
                 cy.log(`Table view memory consumption ${curMemoryUsage} MB`)
                 let thresPageload = loadTimes.table + loadTimes.table * 0.5
@@ -70,17 +65,17 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
         })
     })
 
-    it("(OCP-67725, memodi, Network_Observability) should measure topology page load times", function () {
-        cy.get('#tabs-container li:nth-child(3)').click()
+    it("(OCP-67725, memodi) should measure topology page load times", function () {
+        cy.get('#tabs-container').contains('Topology').click()
         netflowPage.clearAllFilters()
         const start = performance.now()
-        cy.intercept('GET', getTopologyScopeURL("namespace"), {
+        cy.intercept('GET', topologyPage.getScopeURL("namespace"), {
             fixture: 'perf/flow_metrics_perf.json'
         })
         cy.get('[data-surface="true"]').should('be.visible').then(() => {
             cy.wrap(performance.now()).then(end => {
                 let pageload = Math.round(end - start)
-                let curMemoryUsage = Math.round(window.performance.memory.usedJSHeapSize / 1048576)
+                let curMemoryUsage = getMemoryUsageMB()
                 cy.log(`Topology view page load took ${pageload} ms.`)
                 cy.log(`Topology view memory consumption ${curMemoryUsage} MB`)
                 let thresPageload = loadTimes.topology + loadTimes.topology * 0.5
@@ -94,7 +89,7 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
         netflowPage.resetClearFilters()
     })
 
-    after("suite", function () {
+    after("all tests", function () {
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })
 })

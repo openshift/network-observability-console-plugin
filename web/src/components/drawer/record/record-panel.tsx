@@ -327,6 +327,7 @@ export const RecordPanel: React.FC<RecordDrawerProps> = ({
               onClick={() => toggle(toggleId)}
               id={toggleId}
               isExpanded={!hidden.includes(toggleId)}
+              data-test-id={`${key}-toggle`}
             >
               {g.title}
             </AccordionToggle>

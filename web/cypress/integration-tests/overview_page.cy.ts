@@ -1,7 +1,7 @@
 import { genSelectors, netflowPage, overviewSelectors, querySumSelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
-describe('(OCP-54839 Network_Observability) Netflow Overview page tests', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-54839) Netflow Overview page tests', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -21,7 +21,7 @@ describe('(OCP-54839 Network_Observability) Netflow Overview page tests', { tags
         cy.checkPanelsNum();
     })
 
-    it("(OCP-54839, aramesha, Network_Observability) should validate overview page features", { tags: ['@netobserv-critical'] }, function () {
+    it("(OCP-54839, aramesha) should validate overview page features", { tags: ['@netobserv-critical'] }, function () {
         cy.byTestID(genSelectors.timeDrop).then(btn => {
             expect(btn).to.exist
             cy.wrap(btn).click().then(drop => {
@@ -67,7 +67,7 @@ describe('(OCP-54839 Network_Observability) Netflow Overview page tests', { tags
         })
     })
 
-    it("(OCP-54839, aramesha, Network_Observability) should validate query summary panel", function () {
+    it("(OCP-54839, aramesha) should validate query summary panel", function () {
         cy.get(querySumSelectors.bytesCount).should('exist').then(bytesCnt => {
             cy.checkQuerySummary(bytesCnt)
         })
@@ -83,7 +83,7 @@ describe('(OCP-54839 Network_Observability) Netflow Overview page tests', { tags
         cy.contains('Sampling').should('exist')
     })
 
-    it("(OCP-54839, aramesha, Network_Observability) should validate panels", { tags: ['@netobserv-critical'] }, function () {
+    it("(OCP-54839, aramesha) should validate panels", { tags: ['@netobserv-critical'] }, function () {
         cy.showAdvancedOptions().then(views => {
             cy.contains('Display options').should('exist').click()
 
@@ -126,7 +126,7 @@ describe('(OCP-54839 Network_Observability) Netflow Overview page tests', { tags
         cy.get(overviewSelectors.panelsModal).contains('Save').should('be.disabled');
 
         // select 1 panel and verify its visible on console
-        cy.get('.pf-v5-c-data-list__check > #top_avg_packet_rates').click();
+        cy.get('[data-test="overview-panel-management"]').find('#top_avg_packet_rates').check();
         cy.get(overviewSelectors.panelsModal).contains('Save').click();
         netflowPage.waitForLokiQuery()
         cy.checkPanel([overviewSelectors.allPanels[2]])
@@ -145,7 +145,7 @@ describe('(OCP-54839 Network_Observability) Netflow Overview page tests', { tags
         netflowPage.resetClearFilters()
     })
 
-    after("after all tests are done", function () {
+    after("all tests", function () {
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })
 })

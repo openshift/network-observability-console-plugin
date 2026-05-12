@@ -1,6 +1,6 @@
 import { Operator } from "@views/netobserv"
 import { netflowPage, querySumSelectors, topologySelectors } from "@views/netflow-page"
-import { dashboard, graphSelector } from "@views/dashboards-page"
+import { dashboard } from "@views/dashboards-page"
 
 const metricType = [
     "Bytes",
@@ -18,7 +18,7 @@ const PacketDropPanels = [
     "top-drops-per-infra-workload-(pps)-chart",
 ]
 
-describe('(OCP-66141 Network_Observability) PacketDrop dashboards test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-66141) PacketDrop dashboards test', { tags: ['Network_Observability'] }, function () {
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
         cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
@@ -28,9 +28,9 @@ describe('(OCP-66141 Network_Observability) PacketDrop dashboards test', { tags:
         Operator.createFlowcollector("PacketDrop")
     })
 
-    it("(OCP-66141, aramesha, Network_Observability) Validate PacketDrop edge labels and Query Summary stats", function () {
+    it("(OCP-66141, aramesha) Validate PacketDrop edge labels and Query Summary stats", function () {
         netflowPage.visit()
-        cy.get('#tabs-container li:nth-child(3)').click()
+        cy.get('#tabs-container').contains('Topology').click()
         cy.get('#drawer').should('not.be.empty')
 
         cy.byTestID("show-view-options-button").should('exist').click().then(views => {
@@ -79,20 +79,20 @@ describe('(OCP-66141 Network_Observability) PacketDrop dashboards test', { tags:
         netflowPage.resetClearFilters()
     })
 
-    it("(OCP-66141, aramesha, Network_Observability) Validate packetDrop dashboards", function () {
+    it("(OCP-66141, aramesha) Validate packetDrop dashboards", function () {
         // navigate to 'NetObserv / Main' Dashboard page
         dashboard.visit()
         dashboard.visitDashboard("netobserv-main")
 
         // verify 'Drops' panel
-        cy.get('[data-test="drops-chart"]').find(graphSelector.graphBody).should('not.have.class', 'graph-empty-state')
+        cy.checkDashboards(['drops-chart'])
 
         cy.get('#content-scrollable').scrollTo('bottom')
 
         cy.checkDashboards(PacketDropPanels)
     })
 
-    after("Delete flowcollector", function () {
+    after("all tests", function () {
         Operator.deleteFlowCollector()
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })

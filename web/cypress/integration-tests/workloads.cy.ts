@@ -6,7 +6,7 @@ const pagesToVisit = ["/k8s/ns/netobserv/core~v1~Pod",
     "/k8s/ns/netobserv/apps~v1~ReplicaSet",
 ]
 
-describe('(OCP-70972 Network_Observability) Netflow traffic pages on workloads', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-70972) Netflow traffic pages on workloads', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -17,13 +17,13 @@ describe('(OCP-70972 Network_Observability) Netflow traffic pages on workloads',
         Operator.createFlowcollector()
     })
 
-    it('(OCP-70972, memodi, Network_Observability), netflow traffic pages should appear on workloads', { tags: ["@smoke"] }, function () {
+    it('(OCP-70972, memodi), netflow traffic pages should appear on workloads', { tags: ["@smoke"] }, function () {
         pagesToVisit.forEach((page) => {
             cy.clearLocalStorage()
             cy.visitNetflowTrafficTab(page)
         })
     })
-    after("after all tests are done", function () {
+    after("all tests", function () {
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })
 

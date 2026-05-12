@@ -30,4 +30,5 @@ spec:
       source: registry.redhat.io/network-observability/network-observability-operator-bundle
     - mirrors:
       - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-pf4-ystream
+      - quay.io/redhat-user-workloads/ocp-network-observab-tenant/network-observability-console-plugin-pf4-zstream
       source: registry.redhat.io/network-observability/network-observability-console-plugin-compat-rhel9

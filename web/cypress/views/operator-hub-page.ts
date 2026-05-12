@@ -1,6 +1,4 @@
 import { listPage } from "@views/list-page";
-import { Pages } from "./pages";
-import { helperfuncs } from './utils';
 
 const sourceActions = (name: string, action: string) => {
   cy.get('form[data-test-group-name="source"]', { timeout: 60000 })
@@ -44,7 +42,7 @@ export const installedOperators = {
 
 export const operatorHubPage = {
   getAllTileLabels: () => {
-    return cy.get('.pf-v5-c-badge')
+    return cy.get('.co-catalog-tile').find('[role="status"]')
   },
   checkCustomCatalog: (name: string) => {
     sourceActions(name, 'view');
@@ -98,7 +96,9 @@ export const operatorHubPage = {
     cy.byTestID('Enable-radio-input').click()
     cy.byTestID('install-operator').trigger('click')
     cy.get('#operator-install-page').should('exist')
-    Pages.gotoInstalledOperatorPage();
+    // Navigate to installed operators page
+    cy.visit('/k8s/all-namespaces/operators.coreos.com~v1alpha1~ClusterServiceVersion');
+    cy.contains('Installed Operators').should('exist');
 
     cy.contains(name).parents('tr').within(() => {
       cy.byTestID("status-text", { timeout: 180000 }).should('have.text', "Succeeded")
@@ -109,7 +109,12 @@ export const operatorHubPage = {
     cy.get('body').should('be.visible');
     if (installNamespace) {
       cy.get('[data-test="A specific namespace on the cluster-radio-input"]').click();
-      helperfuncs.clickIfExist('input[data-test="Select a Namespace-radio-input"]');
+      // Click element if it exists (with retry)
+      cy.get('input[data-test="Select a Namespace-radio-input"]', { timeout: 10000 }).then(($els) => {
+        if ($els.length) {
+          cy.wrap($els.first()).click();
+        }
+      });
       cy.get('button#dropdown-selectbox').click();
       cy.contains('span', `${installNamespace}`).click();
     }
@@ -196,7 +201,7 @@ export const operatorHubPage = {
 
 export const operatorHubModal = {
   clickInstall: () => {
-    cy.get('[data-test-id="operator-install-btn"]').click({ force: true });
+    cy.byLegacyTestID('operator-install-btn').click({ force: true });
   },
   selectChannel: (channel) => {
     cy.get('h5').contains('Channel').parent('div').within(() => {

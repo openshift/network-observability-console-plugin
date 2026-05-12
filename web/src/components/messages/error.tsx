@@ -171,6 +171,7 @@ export const ErrorComponent: React.FC<ErrorProps> = ({ title, error }) => {
           <TextContent>
             <Text component={TextVariants.h4}>{infoName}</Text>
             <ClipboardCopy
+              data-test="clipboard-copy-error"
               isCode
               isExpanded
               hoverTip={t('Copy')}

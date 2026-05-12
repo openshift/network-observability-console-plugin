@@ -22,26 +22,10 @@ describe('Network_Observability networking dashboards tests', { tags: ['Network_
 
         // navigate to 'Networking / Ingress' Dashboard page
         dashboard.visit()
-        cy.visit(`/monitoring/dashboards/grafana-dashboard-ingress-operator`)
-
-        cy.get('[data-test="poll-interval-dropdown"] > .pf-v6-c-menu-toggle').should('exist').then(btn => {
-            cy.wrap(btn).click().then(drop => {
-                cy.contains('15 seconds').should('exist').click()
-            })
-        })
-
-        cy.get('[data-test="time-range-dropdown"]').should('exist').then(btn => {
-            cy.wrap(btn).click().then(drop => {
-                cy.contains('Last 5 minutes').should('exist').click()
-            })
-        })
-
-        cy.wait(1000)
-        cy.get('#content-scrollable').scrollTo('bottom')
-        cy.wait(1000)
+        dashboard.visitDashboard("grafana-dashboard-ingress-operator")
     })
 
-    it('(OCP-69946, aramesha, Network_Observability), should have ingress operator dashboards', function () {
+    it('(OCP-69946, aramesha), should have ingress operator dashboards', function () {
         // verify that 'Current Total Incoming Bandwidth', 'Current Total Outgoing Bandwidth', 'HTTP Error Rate' and 'HTTP Server Average Response Latency' panels exist and are populated
         cy.checkDashboards(ingressPanels)
 

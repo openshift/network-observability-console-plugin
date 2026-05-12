@@ -6,6 +6,14 @@ import './console-utilities';
 import './selectors';
 
 /// <reference types="cypress" />
+
+/**
+ * Escapes a string for safe use in shell commands
+ * Wraps the value in single quotes and escapes any single quotes within
+ */
+function escapeShellArg(arg: string): string {
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
 // ***********************************************
 // This example commands.ts shows you how to
 // create various custom commands and overwrite
@@ -329,6 +337,28 @@ Cypress.Commands.add('uiLogout', () => {
   })
 });
 
+Cypress.Commands.add("cliLogin", (username?: string, password?: string) => {
+  const kubeconfig = Cypress.env('KUBECONFIG_PATH');
+  const loginUsername = username || Cypress.env('LOGIN_USERNAME');
+  const loginPassword = password || Cypress.env('LOGIN_PASSWORD');
+
+  if (!kubeconfig || !loginUsername || !loginPassword) {
+    throw new Error('cliLogin requires KUBECONFIG_PATH, LOGIN_USERNAME, and LOGIN_PASSWORD');
+  }
+
+  cy.exec(`oc whoami --show-server=true --kubeconfig ${escapeShellArg(kubeconfig)}`, { log: false })
+    .then(result => {
+      const hostapi = result.stdout.trim();
+      cy.log(`Server: ${hostapi}`);
+      return cy.exec(
+        `oc login -u ${escapeShellArg(loginUsername)} -p ${escapeShellArg(loginPassword)} ${escapeShellArg(hostapi)} --insecure-skip-tls-verify=true --kubeconfig ${escapeShellArg(kubeconfig)}`,
+        { failOnNonZeroExit: true, log: false }
+      );
+    })
+    .its('code')
+    .should('eq', 0);
+});
+
 Cypress.Commands.add('retryTask', (command, expectedOutput, options?) => {
   const { retries, interval } = options || DEFAULT_RETRY_OPTIONS;
   const retryTaskFn = (currentRetries) => {
@@ -381,6 +411,7 @@ declare global {
       adminCLI(command: string, options?: Partial<Cypress.ExecOptions>): Chainable<void>
       uiLogin(provider: string, username: string, password: string): Chainable<void>
       uiLogout(): Chainable<void>
+      cliLogin(username?: string, password?: string): Chainable<void>
       switchPerspective(perspective: string): Chainable<void>
       checkCommandResult(command: string, expectedoutput: string, options?: { retries?: number; interval?: number }): Chainable<void>
       retryTask(condition: string, expectedoutput: string, options?: { retries?: number; interval?: number }): Chainable<void>

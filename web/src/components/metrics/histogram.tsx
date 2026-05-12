@@ -266,6 +266,7 @@ export const Histogram: React.FC<HistogramProps> = ({
             isVisible={tooltipsTrigger === 'manual' ? false : undefined}
           >
             <Button
+              data-test="histogram-double-left"
               icon={<AngleDoubleLeftIcon />}
               variant="plain"
               className={`metrics-content-button ${loading ? 'loading' : ''}`}
@@ -279,6 +280,7 @@ export const Histogram: React.FC<HistogramProps> = ({
             isVisible={tooltipsTrigger === 'manual' ? false : undefined}
           >
             <Button
+              data-test="histogram-single-left"
               icon={<AngleLeftIcon />}
               variant="plain"
               className={`metrics-content-button ${loading ? 'loading' : ''}`}
@@ -297,6 +299,7 @@ export const Histogram: React.FC<HistogramProps> = ({
             isVisible={tooltipsTrigger === 'manual' ? false : undefined}
           >
             <Button
+              data-test="histogram-single-right"
               icon={<AngleRightIcon />}
               variant="plain"
               className={`metrics-content-button ${loading ? 'loading' : ''}`}
@@ -309,6 +312,7 @@ export const Histogram: React.FC<HistogramProps> = ({
             isVisible={tooltipsTrigger === 'manual' ? false : undefined}
           >
             <Button
+              data-test="histogram-double-right"
               icon={<AngleDoubleRightIcon />}
               variant="plain"
               className={`metrics-content-button ${loading ? 'loading' : ''}`}
@@ -325,6 +329,7 @@ export const Histogram: React.FC<HistogramProps> = ({
                 isVisible={tooltipsTrigger === 'manual' ? false : undefined}
               >
                 <Button
+                  data-test="histogram-zoom-out"
                   icon={<SearchMinusIcon />}
                   variant="plain"
                   className={`metrics-content-button ${loading ? 'loading' : ''}`}
@@ -340,6 +345,7 @@ export const Histogram: React.FC<HistogramProps> = ({
                 isVisible={tooltipsTrigger === 'manual' ? false : undefined}
               >
                 <Button
+                  data-test="histogram-zoom-in"
                   icon={<SearchPlusIcon />}
                   variant="plain"
                   className={`metrics-content-button ${loading ? 'loading' : ''}`}

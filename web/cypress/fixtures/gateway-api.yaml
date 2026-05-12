@@ -1,0 +1,121 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netobserv-gateway-test
+  labels:
+    app: gwapi
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: openshift-default
+spec:
+  controllerName: openshift.io/gateway-controller/v1
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: test-gateway-owner
+  namespace: netobserv-gateway-test
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  - name: demo
+    hostname: gwapi.example.com
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            app: gwapi
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: test-httproute
+  namespace: netobserv-gateway-test
+  labels:
+    app: gwapi
+spec:
+  parentRefs:
+  - name: test-gateway-owner
+    namespace: netobserv-gateway-test
+  hostnames: ["gwapi.example.com"]
+  rules:
+  - backendRefs:
+    - name: echo-service
+      port: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-service
+  namespace: netobserv-gateway-test
+  labels:
+    app: gwapi
+spec:
+  selector:
+    app: echo-server
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-server
+  namespace: netobserv-gateway-test
+  labels:
+    app: gwapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo-server
+  template:
+    metadata:
+      labels:
+        app: echo-server
+    spec:
+      containers:
+      - name: echo
+        image: hashicorp/http-echo:latest
+        args:
+        - -text=echo response
+        - -listen=:8080
+        ports:
+        - containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-generator
+  namespace: netobserv-gateway-test
+  labels:
+    app: gwapi
+    component: traffic-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic-generator
+  template:
+    metadata:
+      labels:
+        app: traffic-generator
+    spec:
+      containers:
+      - name: traffic-gen
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do
+            curl -s -H 'Host: gwapi.example.com' http://test-gateway-owner-openshift-default.netobserv-gateway-test.svc.cluster.local:8080 || true
+            sleep 5
+          done

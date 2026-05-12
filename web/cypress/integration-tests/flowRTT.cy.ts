@@ -1,7 +1,7 @@
 import { colSelectors, netflowPage, overviewSelectors, querySumSelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
-describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -16,18 +16,7 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
         netflowPage.visit()
     })
 
-    it("(OCP-68246, aramesha, Network_Observability) Verify flowRTT panels", function () {
-        // to reduce flakes restore default panels first time it comes to overview page
-        cy.openPanelsModal();
-        cy.get(overviewSelectors.panelsModal).contains('Restore default panels').click();
-        cy.get(overviewSelectors.panelsModal).contains('Save').click();
-        netflowPage.waitForLokiQuery()
-
-        // verify Query Summary stats for flowRTT
-        cy.get(querySumSelectors.avgRTT).should('exist').then(avgRTT => {
-            cy.checkQuerySummary(avgRTT)
-        })
-
+    it("(OCP-68246, aramesha) Verify flowRTT panels", function () {
         // verify default flowRTT panels are visible
         cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
         cy.checkPanelsNum(5);
@@ -44,10 +33,23 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
 
         netflowPage.waitForLokiQuery()
         cy.checkPanel(overviewSelectors.allFlowRTTPanels)
+
+        // restore default panels and verify they are visible
+        cy.openPanelsModal();
+        cy.byTestID(overviewSelectors.resetDefault).click().byTestID(overviewSelectors.save).click()
+        netflowPage.waitForLokiQuery()
+        cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
+        cy.checkPanelsNum(5);
+
+        // verify Query Summary stats for flowRTT
+        // Wait for flows to be collected and metrics to be non-zero (retry up to 120s)
+        cy.get(querySumSelectors.avgRTT, { timeout: 120000 }).should('exist').then(avgRTT => {
+            cy.checkQuerySummary(avgRTT)
+        })
     })
 
-    it("(OCP-68246, aramesha, Network_Observability) Verify default flowRTT column", function () {
-        cy.get('#tabs-container li:nth-child(2)').click()
+    it("(OCP-68246, aramesha) Verify default flowRTT column", function () {
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('exist')
         netflowPage.stopAutoRefresh()
 
@@ -61,7 +63,7 @@ describe('(OCP-68246 Network_Observability) FlowRTT test', { tags: ['Network_Obs
         netflowPage.resetClearFilters()
     })
 
-    after("Delete flowcollector", function () {
+    after("all tests", function () {
         Operator.deleteFlowCollector()
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })

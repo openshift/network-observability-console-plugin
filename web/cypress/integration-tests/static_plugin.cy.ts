@@ -1,7 +1,7 @@
 import { netflowPage, overviewSelectors, pluginSelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
-describe('(OCP-84156 Network_Observability) StaticPlugin test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-84156) StaticPlugin test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -12,7 +12,7 @@ describe('(OCP-84156 Network_Observability) StaticPlugin test', { tags: ['Networ
         Operator.createFlowcollector("StaticPlugin")
     })
 
-    it("(OCP-84156, aramesha, Network_Observability) Edit flowcollector form view", function () {
+    it("(OCP-84156, aramesha) Edit flowcollector form view", function () {
         // Edit flowcollector form view to update sampling to 1
         cy.visit('k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/status')
         cy.get(pluginSelectors.editFlowcollector).click()
@@ -41,7 +41,7 @@ describe('(OCP-84156 Network_Observability) StaticPlugin test', { tags: ['Networ
         netflowPage.resetClearFilters()
     })
 
-    after("Delete flowcollector", function () {
+    after("all tests", function () {
         Operator.deleteFlowCollector()
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })

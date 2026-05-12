@@ -142,6 +142,7 @@ export const FieldSet: React.FC<FieldSetProps> = props => {
       <AccordionItem>
         <AccordionToggle
           id={`${idSchema.$id}_accordion-toggle`}
+          data-test={`${idSchema.$id}_accordion-toggle`}
           onClick={() => setExpanded(!expanded)}
           isExpanded={expanded}
         >
@@ -156,7 +157,11 @@ export const FieldSet: React.FC<FieldSetProps> = props => {
             padding={true}
           />
         )}
-        <AccordionContent id={`${idSchema.$id}_accordion-content`} isHidden={!expanded}>
+        <AccordionContent
+          id={`${idSchema.$id}_accordion-content`}
+          data-test={`${idSchema.$id}_accordion-content`}
+          isHidden={!expanded}
+        >
           {children}
         </AccordionContent>
       </AccordionItem>

@@ -117,6 +117,7 @@ export const ArrayFieldTemplate: React.FC<ArrayFieldTemplateProps> = ({
                 <Button
                   icon={<MinusCircleIcon className="co-icon-space-r" />}
                   id={`${item.key}_remove-btn`}
+                  data-test-id={`${item.key}_remove-btn`}
                   type="button"
                   onClick={item.onDropIndexClick(item.index)}
                   variant="link"
@@ -133,6 +134,7 @@ export const ArrayFieldTemplate: React.FC<ArrayFieldTemplateProps> = ({
         <Button
           icon={<PlusCircleIcon className="co-icon-space-r" />}
           id={`${idSchema.$id}_add-btn`}
+          data-test-id={`${idSchema.$id}_add-btn`}
           type="button"
           onClick={onAddClick}
           variant="link"
@@ -147,7 +149,13 @@ export const ArrayFieldTemplate: React.FC<ArrayFieldTemplateProps> = ({
 export const ErrorTemplate: React.FC<{ errors: string[] }> = ({ errors }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
   return (
-    <Alert isInline className="co-alert co-break-word co-alert--scrollable" variant="danger" title={t('Error')}>
+    <Alert
+      isInline
+      className="co-alert co-break-word co-alert--scrollable"
+      variant="danger"
+      title={t('Error')}
+      data-test-id="dynamic-form-validation-errors"
+    >
       {t('Fix the following errors:')}
       <ul>
         {_.map(errors, error => (

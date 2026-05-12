@@ -92,7 +92,12 @@ export const HealthCard: React.FC<HealthCardProps> = ({
   }
 
   return (
-    <Card className={classes.join(' ')} isClickable={onClick !== undefined} isClicked={isSelected}>
+    <Card
+      className={classes.join(' ')}
+      data-test={`health-card-${name || 'global'}`}
+      isClickable={onClick !== undefined}
+      isClicked={isSelected}
+    >
       <CardHeader
         className={hideTitle ? 'card-header-hidden' : 'card-header'}
         selectableActions={{

@@ -24,13 +24,13 @@ describe.skip('NetObserv developer view', { tags: ['Network_Observability'] }, f
         Operator.createFlowcollector()
     })
 
-    it("(OCP-75874, aramesha, Network_Observability) should verify developer view - Loki DataSource", function () {
+    it("(OCP-75874, aramesha) should verify developer view - Loki DataSource", function () {
         // verify Netflow traffic tab
         netflowPage.visit()
         cy.checkNetflowTraffic()
     })
 
-    it("(OCP-75874, OCP-73876 aramesha, Network_Observability) should verify developer view - Prom DataSource", function () {
+    it("(OCP-75874, OCP-73876 aramesha) should verify developer view - Prom DataSource", function () {
         // Deploy flowcollector with Loki disabled
         Operator.createFlowcollector("LokiDisabled")
 
@@ -40,11 +40,11 @@ describe.skip('NetObserv developer view', { tags: ['Network_Observability'] }, f
 
         // Deploy client server manifests logged in as user2
         cy.cliLogin(`${user2}`, `${user2Passwd}`)
-        cy.exec(`oc create -f cypress/fixtures/testuser-server-client.yaml`)
+        cy.adminCLI(`oc create -f cypress/fixtures/testuser-server-client.yaml`)
 
         // Logout from console as user1 and login as user2
         cy.uiLogout().then(() => {
-            cy.visit(Cypress.config('baseUrl'))
+            cy.visit(Cypress.config('baseUrl') || '/')
         })
         cy.uiLogin(Cypress.env('LOGIN_IDP'), user2, user2Passwd)
 
@@ -57,7 +57,7 @@ describe.skip('NetObserv developer view', { tags: ['Network_Observability'] }, f
 
         // Logout from console as user2 and login as user3
         cy.uiLogout().then(() => {
-            cy.visit(Cypress.config('baseUrl'))
+            cy.visit(Cypress.config('baseUrl') || '/')
         })
         cy.uiLogin(Cypress.env('LOGIN_IDP'), user3, user3Passwd)
 
@@ -69,7 +69,7 @@ describe.skip('NetObserv developer view', { tags: ['Network_Observability'] }, f
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user netobserv-metrics-reader ${user3}`)
     })
 
-    after("after all tests are done", function () {
+    after("all tests", function () {
         cy.adminCLI(`oc login -u system:admin`)
         cy.adminCLI(`oc delete flowcollector cluster`)
         cy.adminCLI(`oc delete project test-server --ignore-not-found`)

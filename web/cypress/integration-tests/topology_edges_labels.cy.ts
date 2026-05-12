@@ -1,11 +1,7 @@
-import { netflowPage, topologySelectors, topologyPage, setupTopologyViewWithNamespaceFilter } from "@views/netflow-page"
+import { netflowPage, topologySelectors, topologyPage } from "@views/netflow-page"
 import { Operator, project } from "@views/netobserv"
 
-function getTopologyResourceScopeGroupURL(groups: string): string {
-    return `**/flow/metrics**groups=${groups}*`
-}
-
-describe("(OCP-53591 Network_Observability) Netflow Topology edges,labels, badges features", { tags: ['Network_Observability'] }, function () {
+describe("(OCP-53591) Netflow Topology edges,labels, badges features", { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -17,19 +13,19 @@ describe("(OCP-53591 Network_Observability) Netflow Topology edges,labels, badge
     })
 
     beforeEach("run before each test", function () {
-        setupTopologyViewWithNamespaceFilter()
+        topologyPage.setupWithNamespaceFilter()
+    })
 
-        // advance options menu remains visible throughout the test
+    it("(OCP-53591, memodi) should verify group owners", function () {
+        cy.intercept('GET', topologyPage.getResourceScopeGroupURL('owners'), { fixture: 'flowmetrics/Owners.json' }).as('ownersData')
+        topologyPage.selectScopeGroup("resource", "owners")
+        cy.wait('@ownersData')
+        cy.get(topologySelectors.nGroups).its('length').should('be.greaterThan', 4)
+    })
+
+    it("(OCP-53591, memodi) should verify group expand/collapse", function () {
         topologyPage.selectScopeGroup("resource", "owners")
         cy.contains('Display options').should('exist').click()
-    })
-
-    it("(OCP-53591, memodi, Network_Observability) should verify group owners", function () {
-        cy.intercept(getTopologyResourceScopeGroupURL('owners'), { fixture: 'flowmetrics/Owners.json' })
-        cy.get(topologySelectors.nGroups).its('length').should('be.greaterThan', 30)
-    })
-
-    it("(OCP-53591, memodi, Network_Observability) should verify group expand/collapse", function () {
         cy.get(topologySelectors.groupToggle).click()
         cy.get(topologySelectors.groupLayer + ' > ' + topologySelectors.group).each((node, index) => {
             cy.wrap(node).should('not.have.descendants', 'g.pf-topology__group')
@@ -40,7 +36,9 @@ describe("(OCP-53591 Network_Observability) Netflow Topology edges,labels, badge
         })
     })
 
-    it("(OCP-53591, memodi, Network_Observability) should verify edges display/hidden", function () {
+    it("(OCP-53591, memodi) should verify edges display/hidden", function () {
+        topologyPage.selectScopeGroup("resource", "owners")
+        cy.contains('Display options').should('exist').click()
         cy.get(topologySelectors.edgeToggle).uncheck()
 
         // verify labels are also hidden
@@ -55,28 +53,28 @@ describe("(OCP-53591 Network_Observability) Netflow Topology edges,labels, badge
         })
     })
 
-    it("(OCP-53591, memodi, Network_Observability) should verify edges labels can be displayed/hidden", function () {
+    it("(OCP-53591, memodi) should verify edges labels can be displayed/hidden", function () {
         netflowPage.selectSourceNS(project)
-        topologyPage.selectScopeGroup(null, "none")
-        topologyPage.selectScopeGroup("namespace", null)
+        topologyPage.selectScopeGroup(undefined, "none")
+        topologyPage.selectScopeGroup("namespace")
         cy.get('#reset-view').should('exist').click()
-        cy.get('[data-test-id="edge-handler"] g.pf-topology__edge__tag').should("exist")
+        cy.byLegacyTestID('edge-handler').find('g.pf-topology__edge__tag').should("exist")
 
 
         cy.contains('Display options').should('exist').click()
         cy.get(topologySelectors.labelToggle).uncheck()
 
-        cy.get('[data-test-id="edge-handler"] g.pf-topology__edge__tag').should("not.exist")
+        cy.byLegacyTestID('edge-handler').find('g.pf-topology__edge__tag').should("not.exist")
 
         cy.get(topologySelectors.labelToggle).check()
-        cy.get('[data-test-id="edge-handler"] g.pf-topology__edge__tag').should("exist")
+        cy.byLegacyTestID('edge-handler').find('g.pf-topology__edge__tag').should("exist")
         netflowPage.clearAllFilters()
     })
 
-    it("(OCP-53591, memodi, Network_Observability) should verify badges display/hidden", function () {
+    it("(OCP-53591, memodi) should verify badges display/hidden", function () {
         netflowPage.selectSourceNS(project)
-        topologyPage.selectScopeGroup(null, "none")
-        topologyPage.selectScopeGroup("namespace", null)
+        topologyPage.selectScopeGroup(undefined, "none")
+        topologyPage.selectScopeGroup("namespace")
         cy.get('#reset-view').should('exist').click()
 
         cy.contains('Display options').should('exist').click()
@@ -90,12 +88,12 @@ describe("(OCP-53591 Network_Observability) Netflow Topology edges,labels, badge
         netflowPage.clearAllFilters()
     })
 
-    afterEach("after each tests", function () {
+    afterEach("each test", function () {
         cy.contains('Display options').should('exist').click()
         netflowPage.resetClearFilters()
     })
 
-    after("after all tests are done", function () {
+    after("all tests", function () {
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })
 })

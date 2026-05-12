@@ -1,4 +1,4 @@
-import { genSelectors, netflowPage, topologySelectors, setupTopologyViewWithNamespaceFilter } from "@views/netflow-page"
+import { genSelectors, netflowPage, topologyPage, topologySelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 
 const metricFunction = [
@@ -13,7 +13,7 @@ const metricType = [
     "Packets"
 ]
 
-describe("(OCP-53591 Network_Observability) Netflow Topology view features", { tags: ['Network_Observability'] }, function () {
+describe("(OCP-53591) Netflow Topology view features", { tags: ['Network_Observability'] }, function () {
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
         cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
@@ -24,10 +24,10 @@ describe("(OCP-53591 Network_Observability) Netflow Topology view features", { t
     })
 
     beforeEach("run before each test", function () {
-        setupTopologyViewWithNamespaceFilter()
+        topologyPage.setupWithNamespaceFilter()
     })
 
-    it("(OCP-53591, memodi, Network_Observability) should verify topology page features", { tags: ['@netobserv-critical'] }, function () {
+    it("(OCP-53591, memodi) should verify topology page features", { tags: ['@netobserv-critical'] }, function () {
         cy.byTestID('search-topology-element-input').should('exist')
         cy.contains('Display options').should('exist').click()
 
@@ -49,7 +49,7 @@ describe("(OCP-53591 Network_Observability) Netflow Topology view features", { t
         cy.get('#query-summary').should('exist')
     })
 
-    it("(OCP-53591, memodi, Network_Observability) should verify local storage", function () {
+    it("(OCP-53591, memodi) should verify local storage", function () {
         // modify some options
         cy.contains('Display options').should('exist').click()
         cy.byTestID('truncate-dropdown').click().byTestID("25").click()
@@ -62,7 +62,9 @@ describe("(OCP-53591 Network_Observability) Netflow Topology view features", { t
         cy.get('#drawer').should('exist')
 
         cy.get('#pageHeader').should('exist').then(() => {
-            const settings = JSON.parse(localStorage.getItem('netobserv-plugin-settings'))
+            const rawSettings = localStorage.getItem('netobserv-plugin-settings')
+            expect(rawSettings, 'netobserv-plugin-settings should exist').to.not.be.null
+            const settings = JSON.parse(rawSettings as string)
             const topologySettings = settings['netflow-traffic-topology-options']
 
             expect(settings['netflow-traffic-view-id']).to.be.equal('topology')
@@ -78,22 +80,22 @@ describe("(OCP-53591 Network_Observability) Netflow Topology view features", { t
         })
     })
 
-    it("(OCP-53591, memodi, Network_Observability) should verify side panel", function () {
+    it("(OCP-53591, memodi) should verify side panel", function () {
         cy.get('g[data-kind="node"] > g').eq(1).parent().should('exist').click()
         cy.get('#elementPanel').should('be.visible')
 
         // details tab
-        cy.get('#drawer-tabs > ul > li:nth-child(1)').should('exist')
+        cy.get('#drawer-tabs').contains('Details').should('exist')
         // metrics tab
-        cy.get('#drawer-tabs > ul > li:nth-child(2)').should('exist').click()
-        cy.get('div.pf-v5-c-chart').should('exist')
+        cy.get('#drawer-tabs').contains('Metrics').should('exist').click()
+        cy.get('.element-metrics-container svg').should('exist')
     })
 
     afterEach("test", function () {
         netflowPage.resetClearFilters()
     })
 
-    after("after all tests are done", function () {
+    after("all tests", function () {
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })
 })

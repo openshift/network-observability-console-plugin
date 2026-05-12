@@ -26,6 +26,7 @@ export const TextWidget: React.FC<WidgetProps> = props => {
     <NumberWidget {...props} />
   ) : (
     <span
+      data-test={id}
       className={classNames('pf-v5-c-form-control', {
         'pf-m-disabled': disabled,
         'pf-m-readonly': readonly
@@ -50,7 +51,7 @@ export const NumberWidget: React.FC<WidgetProps> = props => {
   const { value, id, onBlur, onChange, onFocus } = props;
   const numberValue = _.toNumber(value);
   return (
-    <span className="pf-v5-c-form-control">
+    <span className="pf-v5-c-form-control" data-test={id}>
       <input
         id={id}
         key={id}
@@ -69,7 +70,7 @@ export const NumberWidget: React.FC<WidgetProps> = props => {
 export const PasswordWidget: React.FC<WidgetProps> = props => {
   const { value = '', id, onBlur, onChange, onFocus } = props;
   return (
-    <span className="pf-v5-c-form-control">
+    <span className="pf-v5-c-form-control" data-test={id}>
       <input
         key={id}
         id={id}
@@ -88,6 +89,7 @@ export const SwitchWidget: React.FC<WidgetProps> = props => {
   const { value, id, label, onBlur, onChange, onFocus } = props;
   return (
     <Switch
+      data-test={id}
       id={id || label}
       key={id || label}
       isChecked={_.isNil(value) ? false : value}
@@ -106,6 +108,7 @@ export const SelectWidget: React.FC<WidgetProps> = props => {
   const { enumOptions = [], title } = options;
   return (
     <Dropdown
+      data-test={id}
       id={id}
       isOpen={isOpen}
       onBlur={onBlur && (() => onBlur(id, value))}
@@ -136,6 +139,7 @@ export const JSONWidget: React.FC<WidgetProps> = props => {
   const { disabled = false, id, onBlur, onChange, onFocus, readonly = false, value = '{}' } = props;
   return (
     <span
+      data-test={id}
       className={classNames('pf-v5-c-form-control', {
         'pf-m-disabled': disabled,
         'pf-m-readonly': readonly
@@ -183,6 +187,7 @@ export const ArrayCheckboxesWidget: React.FC<WidgetProps> = props => {
     >
       <Flex
         className="checkboxes-container"
+        data-test={id}
         direction={{ default: enums.length > 4 ? 'row' : 'column' }}
         onBlur={() => onBlur(id, value)}
         onFocus={() => onFocus(id, value)}

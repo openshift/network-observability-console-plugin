@@ -29,6 +29,7 @@ export const DynamicFormFormErrorFallback: React.FC<ErrorBoundaryFallbackProps> 
       isInline
       className="co-alert co-break-word"
       variant="danger"
+      data-test-id="dynamic-form-error-boundary-fallback"
       title={t('There is some issue in this form view. Please select "YAML view" for full control.')}
     />
   );
@@ -56,12 +57,13 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
   const { t } = useTranslation('plugin__netobserv-plugin');
   const [mustSync, setMustSync] = React.useState(false);
   return (
-    <div className="dynamic-form">
+    <div className="dynamic-form" data-test-id="dynamic-form">
       {showAlert && (
         <Alert
           isInline
           className="co-alert co-break-word"
           variant="info"
+          data-test-id="dynamic-form-partial-fields-notice"
           title={t(
             'Note: Some fields may not be represented in this form view. Please select "YAML view" for full control.'
           )}

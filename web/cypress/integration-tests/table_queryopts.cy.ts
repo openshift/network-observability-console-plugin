@@ -5,7 +5,7 @@ function getTableLimitURL(limit: string): string {
     return `**/netflow-traffic**limit=${limit}`
 }
 
-describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Netflow Table Query Options', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table Query Options', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -18,11 +18,11 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
 
     beforeEach('any netflow table test', function () {
         netflowPage.visit()
-        cy.get('#tabs-container li:nth-child(2)').click()
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('exist')
     })
 
-    it("(OCP-50532, aramesha, Network_Observability) should verify Query Options dropdown", { tags: ['@smoke'] }, function () {
+    it("(OCP-50532, aramesha) should verify Query Options dropdown", { tags: ['@smoke'] }, function () {
         // toggle between the page limits
         cy.changeQueryOption('500')
         netflowPage.waitForLokiQuery()
@@ -43,7 +43,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         }).as('matchedUrl')
     })
 
-    it("(OCP-50532, memodi, Network_Observability) should validate query summary panel", { tags: ['@smoke'] }, function () {
+    it("(OCP-50532, memodi) should validate query summary panel", { tags: ['@smoke'] }, function () {
         let warningExists = false
         cy.get(querySumSelectors.queryStatsPanel).should('exist').then(qrySum => {
             if (Cypress.$(querySumSelectors.queryStatsPanel + ' svg.query-summary-warning').length > 0) {
@@ -52,42 +52,19 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         })
 
         cy.get(querySumSelectors.flowsCount).should('exist').then(flowsCnt => {
-            let nflows = 0
-            if (warningExists) {
-                nflows = Number(flowsCnt.text().split('+ Flows')[0])
-            }
-            else {
-                nflows = Number(flowsCnt.text().split(' ')[0])
-            }
+            // parseFloat handles formats: "123 Flows", "123+ Flows", "1.5k Flows", "1.5k+ Flows"
+            const nflows = parseFloat(flowsCnt.text())
             cy.wait(10)
             expect(nflows).to.be.greaterThan(0)
         })
 
         cy.get(querySumSelectors.bytesCount).should('exist').then(bytesCnt => {
-            let nbytes = 0
-            if (warningExists) {
-                nbytes = Number(bytesCnt.text().split('+ ')[0])
-            }
-            else {
-                nbytes = Number(bytesCnt.text().split(' ')[0])
-            }
+            const nbytes = parseFloat(bytesCnt.text())
             expect(nbytes).to.be.greaterThan(0)
         })
 
         cy.get(querySumSelectors.packetsCount).should('exist').then(pktsCnt => {
-            let npkts = 0
-            if (warningExists) {
-                let npktsStr = pktsCnt.text().split('+ ')[0]
-                if (npktsStr.includes('k')) {
-                    npkts = Number(npktsStr.split('k')[0])
-                }
-                else {
-                    npkts = Number(npktsStr)
-                }
-            }
-            else {
-                npkts = Number(pktsCnt.text().split(' ')[0])
-            }
+            const npkts = parseFloat(pktsCnt.text())
             expect(npkts).to.be.greaterThan(0)
         })
         cy.get('#query-summary-toggle').should('exist').click()
@@ -105,7 +82,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
         cy.contains('Date').should('exist')
     })
 
-    it("(OCP-68125, aramesha, Network_Observability) should verify DSCP column", function () {
+    it("(OCP-68125, aramesha) should verify DSCP column", function () {
         netflowPage.stopAutoRefresh()
         cy.openColumnsModal().then(col => {
             cy.get(colSelectors.columnsModal).should('be.visible')
@@ -120,12 +97,12 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408 Network_Observability) Net
 
         // filter on DSCP values
         cy.get(filterSelectors.filterInput).type("dscp=0" + '{enter}').click()
-        cy.get('#dscp-0-toggle > span.pf-v5-c-menu-toggle__text').should('contain.text', 'Standard')
+        cy.get('#dscp-0-toggle').should('contain.text', 'Standard')
 
         // Verify DSCP value is Standard for all rows
         cy.get('[data-test-td-column-id=Dscp]').each((td) => {
-            expect(td).attr("data-test-td-value").to.contain(0)
-            cy.get('[data-test-td-column-id=Dscp] > div > div').should('contain.text', 'Standard')
+            cy.wrap(td).should('have.attr', 'data-test-td-value').and('contain', '0')
+            cy.wrap(td).should('contain.text', 'Standard')
         })
         netflowPage.clearAllFilters()
     })

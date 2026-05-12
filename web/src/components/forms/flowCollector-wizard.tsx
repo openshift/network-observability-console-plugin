@@ -192,10 +192,18 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
                     id="consumption"
                     footer={
                       <WizardFooterWrapper>
-                        <Button variant="primary" onClick={() => ctx.onSubmit(data)}>
+                        <Button
+                          variant="primary"
+                          data-test-id="flowcollector-wizard-consumption-submit"
+                          onClick={() => ctx.onSubmit(data)}
+                        >
                           {t('Submit')}
                         </Button>
-                        <Button variant="link" onClick={() => navigateTo('/')}>
+                        <Button
+                          variant="link"
+                          data-test-id="flowcollector-wizard-consumption-cancel"
+                          onClick={() => navigateTo('/')}
+                        >
                           {t('Cancel')}
                         </Button>
                       </WizardFooterWrapper>

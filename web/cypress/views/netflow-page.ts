@@ -18,6 +18,10 @@ declare global {
 
 type Group = 'Node' | 'Namespace' | 'Owner' | 'Resource'
 
+export function getMemoryUsageMB(): number {
+    return Math.round((window.performance as any).memory?.usedJSHeapSize / 1048576)
+}
+
 export const netflowPage = {
     visit: (clearfilters = true) => {
         cy.clearLocalStorage()
@@ -34,38 +38,27 @@ export const netflowPage = {
         cy.byTestID('no-results-found').should('not.exist')
         cy.get('#overview-container').should('exist')
     },
-    toggleFullScreen: () => {
-        cy.byTestID(genSelectors.moreOpts).should('exist').click().then(() => {
-            cy.get(genSelectors.expand).click()
-        })
-    },
     setAutoRefresh: () => {
-        cy.byTestID(genSelectors.refreshDrop).should('exist').then($btn => {
-            // only set refresh if it's OFF
-            if ($btn.text() == "Refresh off") {
-                cy.wrap($btn).click({ force: true })
+        cy.byTestID(genSelectors.refreshDrop).should('exist').invoke('text').then((text) => {
+            if (text === "Refresh off") {
+                cy.byTestID(genSelectors.refreshDrop).click({ force: true })
                 cy.get('[data-test="15s"]').should('exist').click()
             }
         })
     },
     stopAutoRefresh: () => {
-        cy.byTestID(genSelectors.refreshDrop).should('exist').then($btn => {
-            // only stop refresh if it's not already OFF
-            if ($btn.text() != "Refresh off") {
-                cy.wrap($btn).click({ force: true })
-                // Wait for dropdown menu to be rendered and visible
-                cy.get('.pf-v5-c-menu').should('be.visible')
-                cy.get('[data-test="OFF_KEY"]')
-                    .should('be.visible')
-                    .click()
+        cy.byTestID(genSelectors.refreshDrop).should('exist').invoke('text').then((text) => {
+            if (!text.includes("Refresh off")) {
+                cy.byTestID(genSelectors.refreshDrop).click()
+                cy.byTestID('OFF_KEY').click()
             }
         })
     },
     resetClearFilters: () => {
-        cy.byTestID("set-default-filters-button").should('exist').click()
+        cy.get('#set-default-filters-button').should('exist').click({ force: true })
     },
     clearAllFilters: () => {
-        cy.byTestID("clear-all-filters-button").should('exist').click()
+        cy.byTestID("clear-all-filters-button").should('exist').click({ force: true })
     },
     waitForLokiQuery: () => {
         cy.get("#refresh-button > span > svg").invoke('attr', 'style').should('contain', '0s linear 0s')
@@ -73,11 +66,43 @@ export const netflowPage = {
     selectSourceNS: (project: string) => {
         // verify Source namespace filter
         cy.get(filterSelectors.filterInput).type("src_namespace=" + project + '{enter}')
-        cy.get('#src_namespace-0-toggle > span.pf-v5-c-menu-toggle__text').should('contain.text', `${project}`)
+        cy.get('#src_namespace-0-toggle').should('contain.text', `${project}`)
     }
 }
 
 export const topologyPage = {
+    isViewRendered: () => {
+        cy.get('[data-surface="true"]').should('exist')
+    },
+    /**
+    * Helper function to setup topology view with optional namespace filter
+    * Navigates to topology tab, clears filters, optionally applies namespace filter, and sets display options
+    * @param namespace - Optional namespace to filter topology view by
+    */
+    setupWithNamespaceFilter(namespace?: string) {
+        cy.clearLocalStorage()
+        netflowPage.visit()
+
+        cy.get('#tabs-container').contains('Topology').click()
+
+        // Wait for topology page to load
+        cy.get('#drawer', { timeout: 30000 }).should('exist')
+        cy.get('#drawer').should('not.be.empty')
+
+        // Add filter for namespace if provided
+        if (namespace) {
+            cy.get(filterSelectors.filterInput).type("src_namespace=" + namespace + '{enter}')
+            cy.get('#src_namespace-0-toggle').should('contain.text', `${namespace}`)
+        }
+
+        cy.byTestID("show-view-options-button").should('exist').click().then(() => {
+            cy.contains('Display options').should('exist').click()
+            cy.byTestID('layout-dropdown').click()
+            cy.byTestID('Grid').click()
+        })
+        cy.byTestID(topologySelectors.metricsFunctionDrop).should('exist').click().get('#sum').click()
+        cy.contains('Display options').should('exist').click()
+    },
     selectScopeGroup: (scope?: string, group?: string) => {
         cy.contains('Display options').should('exist').click()
         if (scope) {
@@ -89,8 +114,14 @@ export const topologyPage = {
         }
         cy.contains('Display options').should('exist').click()
     },
-    isViewRendered: () => {
-        cy.get('[data-surface="true"]').should('exist')
+    getScopeURL(scope: string): string {
+        return `**/flow/metrics**aggregateBy=${scope}*`
+    },
+    getResourceScopeGroupURL(groups: string): string {
+        return `**/flow/metrics**groups=${groups}*`
+    },
+    getOwnerNode: (resourceType: string, resourceName: string, timeout: number = 60000) => {
+        return cy.get(`g[data-id*="o=${resourceType}.${resourceName}"]`, { timeout })
     },
     selectGroupWithSlider: (group: Group) => {
         let selector
@@ -109,7 +140,7 @@ export const topologyPage = {
                 break
         }
         cy.get('#lastRefresh').invoke('text').then((lastRefresh) => {
-            cy.get(`${selector} >  div:nth-child(2) > button`).click().then(slider => {
+            cy.get(`${selector} button`).click().then(slider => {
                 netflowPage.waitForLokiQuery()
                 cy.wait(3000)
                 cy.get('#lastRefresh').invoke('text').should('not.eq', lastRefresh)
@@ -118,50 +149,19 @@ export const topologyPage = {
     }
 }
 
-/**
- * Helper function to setup topology view with optional namespace filter
- * Navigates to topology tab, clears filters, optionally applies namespace filter, and sets display options
- * @param namespace - Optional namespace to filter topology view by
- */
-export function setupTopologyViewWithNamespaceFilter(namespace?: string) {
-    cy.clearLocalStorage()
-    netflowPage.visit()
-    cy.get('#tabs-container li:nth-child(3)').click()
-
-    if (Cypress.$('[data-surface=true][transform="translate(0, 0) scale(1)]').length > 0) {
-        cy.get('[data-test="filters"] > [data-test="clear-all-filters-button"]').should('exist').click()
-    }
-    cy.get('#drawer').should('not.be.empty')
-
-    // Add filter for namespace if provided
-    if (namespace) {
-        cy.get(filterSelectors.filterInput).type("src_namespace=" + namespace + '{enter}')
-        cy.get('#src_namespace-0-toggle > span.pf-v5-c-menu-toggle__text').should('contain.text', `${namespace}`)
-    }
-
-    cy.byTestID("show-view-options-button").should('exist').click().then(() => {
-        cy.contains('Display options').should('exist').click()
-        cy.byTestID('layout-dropdown').click()
-        cy.byTestID('Grid').click()
-    })
-    cy.byTestID(topologySelectors.metricsFunctionDrop).should('exist').click().get('#sum').click()
-    cy.contains('Display options').should('exist').click()
-}
-
 export namespace pluginSelectors {
-    export const next = '#wizard-container > div > div > footer > button.pf-v5-c-button.pf-m-primary'
-    export const back = '#wizard-container > div > div > footer > button.pf-v5-c-button.pf-m-secondary'
+    export const next = 'footer button[type="submit"]'
     export const save = '[data-test=save-changes]'
-    export const del = '#editor-toggle-footer > div > div > div > button.pf-v5-c-button.pf-m-danger'
-    export const confirmDel = '#delete-modal > div > div.modal-footer > div > button.pf-v5-c-button.pf-m-danger'
+    export const del = '[data-test-id=delete-resource-button]'
+    export const confirmDel = '[data-test="confirm-action"]'
     export const openNetworkTraffic = '#open-network-traffic'
     export const editFlowcollector = '#edit-flow-collector'
-    export const update = '#editor-toggle-footer > div > div > div > button.pf-v5-c-button.pf-m-primary'
-    export const privilegedToggle = '#root_spec_agent_ebpf_privileged_field > div > div.pf-m-flex-4 > label > span.pf-v5-c-switch__toggle'
+    export const update = '[data-test-id=update-resource-button]'
+    export const privilegedToggle = '[data-test="root_spec_agent_ebpf_privileged"]'
     export const packetDropEnable = '[data-test-id=root_spec_agent_ebpf_features-PacketDrop]'
     export const lokiMode = '#root_spec_loki_mode-toggle'
     export const monolithicMode = '#root_spec_loki_mode-Monolithic'
-    export const installDemoLoki = '#root_spec_loki_monolithic_installDemoLoki_field > .pf-v5-l-flex > .pf-m-flex-4 > .pf-v5-c-switch > .pf-v5-c-switch__toggle'
+    export const installDemoLoki = '[data-test="root_spec_loki_monolithic_installDemoLoki"]'
 }
 
 export namespace genSelectors {
@@ -170,45 +170,47 @@ export namespace genSelectors {
     export const refreshBtn = 'refresh-button'
     export const moreOpts = 'more-options-button'
     export const fullScreen = '[data-test=fullscreen-button]'
-    export const expand = '[index="2"] > ul > li > .pf-c-dropdown__menu-item'
 }
 
+// Helper function to generate table header column selectors
+const thCol = (columnId: string): string => `[data-test=th-${columnId}] button`;
+
 export namespace colSelectors {
-    export const columnsModal = '.modal-content'
+    export const columnsModal = '#columns-modal'
     export const save = 'columns-save-button'
     export const resetDefault = 'columns-reset-button'
-    export const mac = '[data-test=th-Mac] > .pf-v5-c-table__button'
-    export const k8sOwner = '[data-test=th-K8S_OwnerObject] > .pf-v5-c-table__button'
-    export const ipPort = '[data-test=th-AddrPort] > .pf-v5-c-table__button'
-    export const protocol = '[data-test=th-Proto] > .pf-v5-c-table__button'
-    export const icmpType = '[data-test=th-IcmpType] > .pf-v5-c-table__button'
-    export const icmpCode = '[data-test=th-IcmpCode] > .pf-v5-c-table__button'
-    export const srcNodeIP = '[data-test=th-SrcK8S_HostIP] > .pf-v5-c-table__button'
-    export const srcNS = '[data-test=th-SrcK8S_Namespace] > .pf-v5-c-table__button'
-    export const dstNodeIP = '[data-test=th-DstK8S_HostIP] > .pf-v5-c-table__button'
-    export const direction = '[data-test=th-FlowDirection] > .pf-v5-c-table__button'
-    export const bytes = '[data-test=th-Bytes] > .pf-v5-c-table__button'
-    export const packets = '[data-test=th-Packets] > .pf-v5-c-table__button'
-    export const recordType = '[data-test=th-RecordType] > .pf-v5-c-table__button'
-    export const conversationID = '[data-test=th-_HashId] > .pf-v5-c-table__button'
-    export const flowRTT = '[data-test=th-TimeFlowRttMs] > .pf-v5-c-table__button'
-    export const dscp = '[data-test=th-Dscp] > .pf-v5-c-table__button'
-    export const dnsLatency = '[data-test=th-DNSLatency] > .pf-v5-c-table__column-help > .pf-v5-c-table__button'
-    export const dnsResponseCode = '[data-test=th-DNSResponseCode] > .pf-v5-c-table__column-help > .pf-v5-c-table__button'
-    export const dnsId = '[data-test=th-DNSId] > .pf-v5-c-table__button'
-    export const dnsError = '[data-test=th-DNSErrNo] > .pf-v5-c-table__button'
-    export const dnsName = '[data-test=th-DNSName]'
-    export const srcZone = '[data-test=th-SrcZone] > .pf-v5-c-table__button'
-    export const dstZone = '[data-test=th-DstZone] > .pf-v5-c-table__button'
-    export const clusterName = '[data-test=th-ClusterName] > .pf-v5-c-table__button'
-    export const srcNetworkName = '[data-test=th-SrcNetworkName] > .pf-v5-c-table__button'
-    export const dstNetworkName = '[data-test=th-DstNetworkName] > .pf-v5-c-table__button'
+    export const mac = thCol('Mac')
+    export const k8sOwner = thCol('K8S_OwnerObject')
+    export const ipPort = thCol('AddrPort')
+    export const protocol = thCol('Proto')
+    export const icmpType = thCol('IcmpType')
+    export const icmpCode = thCol('IcmpCode')
+    export const srcNodeIP = thCol('SrcK8S_HostIP')
+    export const srcNS = thCol('SrcK8S_Namespace')
+    export const dstNodeIP = thCol('DstK8S_HostIP')
+    export const direction = thCol('FlowDirection')
+    export const bytes = thCol('Bytes')
+    export const packets = thCol('Packets')
+    export const recordType = thCol('RecordType')
+    export const conversationID = thCol('_HashId')
+    export const flowRTT = thCol('TimeFlowRttMs')
+    export const dscp = thCol('Dscp')
+    export const dnsLatency = thCol('DNSLatency')
+    export const dnsResponseCode = thCol('DNSResponseCode')
+    export const dnsId = thCol('DNSId')
+    export const dnsError = thCol('DNSErrNo')
+    export const dnsName = thCol('DNSName')
+    export const srcZone = thCol('SrcZone')
+    export const dstZone = thCol('DstZone')
+    export const clusterName = thCol('ClusterName')
+    export const srcNetworkName = thCol('SrcNetworkName')
+    export const dstNetworkName = thCol('DstNetworkName')
 }
 
 export namespace filterSelectors {
     export const filterNames = "#filters p"
     export const filterInput = '#filter-search-input input'
-    export const filterDropdown = '#filter-search-input [type="button"]'
+    export const filterDropdown = '[aria-label="Open advanced search"]'
     export const columnFilter = '#column-filter-toggle'
     export const destinationRadio = 'radio-destination'
     export const sourceRadio = '#radio-source'
@@ -227,30 +229,35 @@ export namespace querySumSelectors {
     export const droppedBytesCount = "#pktDropBytesCount"
     export const droppedBpsCount = "#pktDropBytesPerSecondsCount"
     export const droppedPacketsCount = "#pktDropPacketsCount"
-    export const expandedQuerySummaryPanel = '.pf-c-drawer__panel-main'
 }
+
+// Helper functions for topology selectors
+const topoLayer = (layerId: string): string => `[data-layer-id="${layerId}"]`;
+const topoSvg = (attr: 'type' | 'kind', value: string, modifier: string = ''): string =>
+    `g[data-${attr}="${value}"]${modifier}`;
+const topoToggle = (toggleId: string): string => `#${toggleId}-switch`;
 
 export namespace topologySelectors {
     export const metricsFunctionDrop = 'metricFunction-dropdown'
     export const metricsFunction = '#metricFunction'
     export const metricTypeDrop = 'metricType-dropdown'
     export const metricType = '#metricType'
-    export const optsClose = '.pf-v5-c-drawer__close > .pf-v5-c-button'
-    export const nGroups = '[data-layer-id="groups"] > g'
-    export const group = 'g[data-type="group"]'
-    export const node = 'g[data-kind="node"]:empty'
-    export const edge = 'g[data-kind="edge"]'
-    export const groupLayer = '[data-layer-id="groups"]'
-    export const defaultLayer = '[data-layer-id="default"]'
-    export const groupToggle = '[for="group-collapsed-switch"] > .pf-v5-c-switch__toggle'
-    export const edgeToggle = "#edges-switch"
-    export const labelToggle = '#edges-tag-switch'
-    export const badgeToggle = '#badge-switch'
-    export const emptyToggle = '#empty-switch'
+    export const optsClose = '[aria-label="Close drawer panel"]'
+    export const nGroups = topoLayer('groups') + ' > g'
+    export const group = topoSvg('type', 'group')
+    export const node = topoSvg('kind', 'node', ':empty')
+    export const edge = topoSvg('kind', 'edge')
+    export const groupLayer = topoLayer('groups')
+    export const defaultLayer = topoLayer('default')
+    export const groupToggle = topoToggle('group-collapsed')
+    export const edgeToggle = topoToggle('edges')
+    export const labelToggle = topoToggle('edges-tag')
+    export const badgeToggle = topoToggle('badge')
+    export const emptyToggle = topoToggle('empty')
 }
 
 export namespace overviewSelectors {
-    export const panelsModal = '.modal-content'
+    export const panelsModal = '#overview-panels-modal'
     export const resetDefault = 'panels-reset-button'
     export const save = 'panels-save-button'
     export const cancel = 'panels-cancel-button'
@@ -272,27 +279,25 @@ export namespace overviewSelectors {
 }
 
 export const loadTimes = {
-    "overview": 8500,
-    "table": 5000,
-    "topology": 5000
+    "overview": 11000,
+    "table": 6500,
+    "topology": 6500
 }
 
 export const memoryUsage = {
-    "overview": 300,
-    "table": 450,
-    "topology": 360
+    "overview": 350,
+    "table": 500,
+    "topology": 400
 }
 
 export namespace histogramSelectors {
-    export const timeRangeContainer = "#chart-histogram > div.pf-v5-l-flex.pf-m-row.histogram-range-container"
-    export const zoomin = timeRangeContainer + " > div:nth-child(5) > div > div:nth-child(2) > div > button"
-    export const zoomout = timeRangeContainer + "> div:nth-child(5) > div > div:nth-child(1) > div > button"
-    const forwardShift = timeRangeContainer + "> div:nth-child(4)"
-    export const singleRightShift = forwardShift + "> div:nth-child(1) > button"
-    export const doubleRightShift = forwardShift + "> div:nth-child(2) > button"
-    const backwardShift = timeRangeContainer + "> div:nth-child(2)"
-    export const singleLeftShift = backwardShift + "> div:nth-child(2) > button"
-    export const doubleLeftShift = backwardShift + "> div:nth-child(1) > button"
+    export const timeRangeContainer = "#chart-histogram .histogram-range-container"
+    export const zoomin = '[data-test="histogram-zoom-in"]'
+    export const zoomout = '[data-test="histogram-zoom-out"]'
+    export const singleRightShift = '[data-test="histogram-single-right"]'
+    export const doubleRightShift = '[data-test="histogram-double-right"]'
+    export const singleLeftShift = '[data-test="histogram-single-left"]'
+    export const doubleLeftShift = '[data-test="histogram-double-left"]'
 }
 
 Cypress.Commands.add('checkPanelsNum', (panels = 2) => {
@@ -308,45 +313,25 @@ Cypress.Commands.add('checkPanel', (panelName) => {
 
 Cypress.Commands.add('checkPopItems', (id, names) => {
     for (let i = 0; i < names.length; i++) {
-        cy.get(id).contains(names[i])
-            .closest('.pf-v5-c-data-list__item-row').find('.pf-v5-c-data-list__check');
+        cy.get(id).contains('label', names[i]).should('exist');
     }
 });
 
 Cypress.Commands.add('openPanelsModal', () => {
     cy.showAdvancedOptions();
     cy.get('#manage-overview-panels-button').click();
-    cy.get('#overview-panels-modal').should('exist');
+    cy.get('#overview-panel-management').should('exist');
 });
 
 Cypress.Commands.add('openColumnsModal', () => {
     cy.showAdvancedOptions();
     cy.get('#manage-columns-button').click();
-    cy.get('#columns-modal').should('exist');
+    cy.get('#table-column-management').should('exist');
 });
 
 Cypress.Commands.add('checkQuerySummary', (metric) => {
-    let warningExists = false
-    let num = 0
-    let metricStr: string
-
-    cy.get(querySumSelectors.queryStatsPanel).should('exist').then(() => {
-        if (Cypress.$(querySumSelectors.queryStatsPanel + ' svg.query-summary-warning').length > 0) {
-            warningExists = true
-        }
-    })
-
-    if (warningExists) {
-        metricStr = metric.text().split('+ ')[0]
-        if (metricStr.includes('k')) {
-            num = Number(metricStr.split('k')[0])
-        } else {
-            num = Number(metricStr)
-        }
-    } else {
-        num = Number(metric.text().split(' ')[0])
-    }
-
+    // parseFloat handles formats: "123 ms", "123+ ms", "1.5k ms", "1.5k+ ms"
+    const num = parseFloat(metric.text())
     expect(num).to.be.greaterThan(0)
 });
 

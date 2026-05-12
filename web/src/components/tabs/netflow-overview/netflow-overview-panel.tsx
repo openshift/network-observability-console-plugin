@@ -60,6 +60,7 @@ export const NetflowOverviewPanel: React.FC<NetflowOverviewPanelProps> = ({
                     <Button
                       variant="plain"
                       className="overview-expand-button"
+                      data-test={`netflow-overview-focus-${id}`}
                       icon={isFocus ? <CompressIcon /> : <ExpandIcon />}
                       onClick={() => focusOn(id)}
                     />

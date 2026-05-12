@@ -1,57 +1,74 @@
-import { netflowPage, setupTopologyViewWithNamespaceFilter, topologyPage, topologySelectors } from "@views/netflow-page"
+import { netflowPage, topologyPage, topologySelectors } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 import { verifyResourceSVGLogo } from "@views/netobserv-logo"
+import { catalogSources } from "@views/catalog-source"
 
-describe("(OCP-87215, Network_Observability) Verify Gateway API three-level owner metadata UI Test\t", function () {
-    const gatewayNS = 'netobserv-gateway-test'
-    const gatewayName = 'test-gateway-owner'
+const gatewayNS = 'netobserv-gateway-test'
+const gatewayName = 'test-gateway-owner'
+
+describe("(OCP-87215) Gateway API owner metadata", { tags: ['Network_Observability'] }, function () {
+    let skipTest = false
+
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
         cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
 
-        Operator.install()
-        cy.checkStorageClass(this)
-        Operator.createFlowcollector("FlowRTT")
+        // Gateway test is only supported from OCP 4.19 onwards
+        catalogSources.getOCPVersion()
+        cy.get('@VERSION').then((version) => {
+            const ocpVersion = parseFloat(String(version))
+            if (ocpVersion < 4.19) {
+                cy.log(`Skipping Gateway test - OCP version ${version} is less than 4.19`)
+                skipTest = true
+                this.skip()
+            }
+        }).then(() => {
+            // Only run setup if test is not being skipped
+            if (!skipTest) {
+                Operator.install()
+                cy.checkStorageClass(this)
+                Operator.createFlowcollector("FlowRTT")
 
-        // Deploy all Gateway API resources from combined template (includes namespace creation and traffic generator)
-        cy.adminCLI(`oc process -f cypress/fixtures/gateway-api-template.yaml \
-            | oc apply -f -`)
+                cy.adminCLI('oc apply -f cypress/fixtures/gateway-api.yaml')
+
+                // Wait for pods to be created
+                cy.wait(10000)
+
+                // Wait for pods to be ready
+                cy.adminCLI('oc wait --for=condition=Ready pod -l app=traffic-generator -n netobserv-gateway-test --timeout=120s')
+                cy.adminCLI('oc wait --for=condition=Ready pod -l app=echo-server -n netobserv-gateway-test --timeout=120s')
+            }
+        })
     })
 
     beforeEach("navigate to topology view", function () {
-        setupTopologyViewWithNamespaceFilter(gatewayNS)
+        topologyPage.setupWithNamespaceFilter(gatewayNS)
     })
 
-    it("(OCP-87215, kapjain, Network_Observability) should verify Gateway appears as owner-level topology node with logo", function () {
-
-        topologyPage.selectScopeGroup("owner", null)
+    it("(OCP-87215, kapjain) Gateway owner logo", function () {
+        topologyPage.selectScopeGroup("owner")
         topologyPage.isViewRendered()
 
-        // Verify topology is rendered
-        cy.get('[data-surface="true"]').should('exist')
+        cy.get(topologySelectors.node, { timeout: 80000 }).should('have.length.greaterThan', 0)
 
-        // Verify nodes exist in the topology
-        cy.get(topologySelectors.node, { timeout: 60000 }).should('have.length.greaterThan', 0)
-
-        // Search for Gateway in topology
         cy.byTestID('search-topology-element-input').should('exist').clear().type(gatewayName)
 
-        // Verify Gateway node exists and is visible
-        cy.get(`g[data-id*="o=Gateway.${gatewayName}"]`, { timeout: 90000 }).should('exist')
-
-        // Validate Gateway SVG icon/logo dynamically
-        verifyResourceSVGLogo('Gateway', gatewayName, 60000)
+        verifyResourceSVGLogo('Gateway', gatewayName)
     })
 
     afterEach("test", function () {
         netflowPage.clearAllFilters()
     })
 
-    after("cleanup Gateway resources", function () {
-        // Delete traffic generator deployment
-        cy.adminCLI(`oc process -f cypress/fixtures/gateway-api-template.yaml \
-            | oc delete -f -`, { failOnNonZeroExit: false })
-        // Remove cluster admin role
+    after("all tests", function () {
+        if (skipTest) {
+            cy.log('Skipping cleanup - test was not run')
+            cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
+            return
+        }
+
+        cy.adminCLI('oc delete -f cypress/fixtures/gateway-api.yaml --ignore-not-found')
+        Operator.deleteFlowCollector()
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })
 })

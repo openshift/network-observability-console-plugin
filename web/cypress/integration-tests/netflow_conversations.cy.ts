@@ -1,7 +1,7 @@
 import { Operator } from "@views/netobserv"
 import { netflowPage, colSelectors, querySumSelectors } from "@views/netflow-page"
 
-describe('(OCP-71787 Network_Observability) Conversation tracking test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-71787) Conversation tracking test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -14,18 +14,18 @@ describe('(OCP-71787 Network_Observability) Conversation tracking test', { tags:
 
     beforeEach('any conversation tracking test', function () {
         netflowPage.visit()
-        cy.get('#tabs-container li:nth-child(2)').click()
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('exist')
     })
 
-    it("(OCP-71787, aramesha, Network_Observability) should validate default conversation tracking columns", function () {
+    it("(OCP-71787, aramesha) should validate default conversation tracking columns", function () {
         cy.byTestID('table-composable').should('exist').within(() => {
             cy.get(colSelectors.recordType).should('exist')
             cy.get(colSelectors.conversationID).should('exist')
         })
     })
 
-    it("(OCP-71787, aramesha, Network_Observability) should verify Query Summary panel", function () {
+    it("(OCP-71787, aramesha) should verify Query Summary panel", function () {
         cy.changeQueryOption('Conversation')
 
         // validate Query Summary panel
@@ -37,13 +37,8 @@ describe('(OCP-71787 Network_Observability) Conversation tracking test', { tags:
         })
 
         cy.get(querySumSelectors.flowsCount).should('exist').then(ConversationsCnt => {
-            let nflows = 0
-            if (warningExists) {
-                nflows = Number(ConversationsCnt.text().split('+ Ended conversations')[0])
-            }
-            else {
-                nflows = Number(ConversationsCnt.text().split(' ')[0])
-            }
+            // parseFloat handles formats: "123 Ended conversations", "123+ Ended conversations"
+            const nflows = parseFloat(ConversationsCnt.text())
             cy.wait(10)
             expect(nflows).to.be.gte(0)
         })
@@ -53,7 +48,7 @@ describe('(OCP-71787 Network_Observability) Conversation tracking test', { tags:
         netflowPage.resetClearFilters()
     })
 
-    after("delete flowcollector and NetObs Operator", function () {
+    after("all tests", function () {
         Operator.deleteFlowCollector()
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })

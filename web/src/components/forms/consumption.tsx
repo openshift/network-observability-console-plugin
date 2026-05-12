@@ -183,6 +183,7 @@ export const Consumption: FC<ResourceCalculatorProps> = ({ flowCollector, setSam
           {t('Use the slider below to configure the desired sampling interval.')}
         </span>
         <Slider
+          data-test-id="flowcollector-consumption-sampling-slider"
           value={getSamplingIndex()}
           customSteps={getSamplings().map((s, i) => ({ value: i, label: String(s) }))}
           max={getSamplings().length - 1}

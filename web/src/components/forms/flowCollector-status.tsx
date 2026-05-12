@@ -140,7 +140,11 @@ export const FlowCollectorStatus: FC<FlowCollectorStatusProps> = () => {
                     </TextContent>
                   </FlexItem>
                   <FlexItem alignSelf={{ default: 'alignSelfCenter' }}>
-                    <Button id="create-flow-collector" onClick={() => navigate(flowCollectorNewPath)}>
+                    <Button
+                      id="create-flow-collector"
+                      data-test-id="create-flow-collector"
+                      onClick={() => navigate(flowCollectorNewPath)}
+                    >
                       {t('Create FlowCollector')}
                     </Button>
                   </FlexItem>

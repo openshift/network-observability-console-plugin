@@ -4,7 +4,7 @@ import { networkHealth, networkHealthSelectors } from "@views/network-health"
 
 const alertServerity = ["Info", "Warning", "Critical"]
 
-describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Network_Observability'] }, function () {
+describe('(OCP-84821) Network Health test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
         cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
@@ -21,10 +21,10 @@ describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Netw
 
     })
 
-    it("(OCP-84821, memodi, Network_Observability) Verify Network Health Alerts", function () {
+    it("(OCP-84821, memodi) Verify Network Health Alerts", function () {
         cy.visit('/monitoring/alertrules')
-        cy.get('#alert-rules-table-scroll').should('exist')
-        cy.byTestID('console-select-menu-toggle').should('exist')
+        cy.get('[data-test="loading-indicator"]', { timeout: 30000 }).should('not.exist')
+        cy.byTestID('name-filter-input').type('DNSNxDomain_PerDst' + '{enter}')
         const variants = ["Namespace", "Workload"]
         variants.forEach(variant => {
             alertServerity.forEach(severity => {
@@ -39,48 +39,42 @@ describe('(OCP-84821 Network_Observability) Network Health test', { tags: ['Netw
         cy.get(networkHealthSelectors.namespace).should('exist')
         cy.get(networkHealthSelectors.workload).should('exist')
 
-        // wait 1min for alert to show up
+        // wait a min for alert to show up
         cy.wait(60000)
-        cy.get(networkHealthSelectors.namespace).should('exist').click().then(() => {
-            networkHealth.verifyAlert("dns-traffic")
-        })
+        cy.get(networkHealthSelectors.namespace).should('exist').click()
+        networkHealth.verifyAlert("dns-traffic")
 
         networkHealth.navigateToAlertPage("dns-traffic")
-        // verify Runbooks on the inspect alert page.
-        cy.get('div .pf-m-link').eq(1).should('have.attr', 'href').and('include', 'https');
     })
 
-    it("(OCP-84821, memodi, Network_Observability) Verify RecordingRules", function () {
+    it("(OCP-84821, memodi) Verify RecordingRules", function () {
         cy.visit('/network-health')
         cy.get(networkHealthSelectors.node).should('exist').click()
 
         networkHealth.verifyAlert("ip", "recording", "Too many DNS NX_DOMAIN errors")
     })
 
-    it("(OCP-84821, memodi, Network_Observability) Verify Health Topology Integration", function () {
+    it("(OCP-84821, memodi) Verify Health Topology Integration", function () {
         cy.visit('/network-health')
 
         cy.get(networkHealthSelectors.namespace).should('exist').click()
         networkHealth.clickOnAlert("dns-traffic")
 
         cy.get(networkHealthSelectors.sidePanel).should('be.visible')
-        // click the kebab button
-        cy.get('div.rule-details-row:nth-child(1) button').click().then(() => {
-            cy.get('button[role="menuitem"]').eq(2).click().then(() => {
+        cy.get('div.rule-details-row').first().find('button').click().then(() => {
+            cy.contains('Inspect network traffic').click().then(() => {
                 cy.checkNetflowTraffic()
-                // select Owner group
                 topologyPage.selectGroupWithSlider("Owner")
                 topologyPage.selectGroupWithSlider("Namespace")
-                // click on the NS and check Health tab in sidebar.
                 cy.get('g[data-kind="node"] > g').eq(1).parent().should('exist').click()
                 cy.get('#elementPanel').should('be.visible')
-                cy.get('#drawer-tabs > ul > li:nth-child(3)').should('exist').click()
+                cy.get('#drawer-tabs').contains('Health').should('exist').click()
                 cy.get('div .rule-details-row').should('exist')
             })
         })
     })
 
-    after("any test", function () {
+    after("all tests", function () {
         cy.adminCLI('oc delete -f cypress/fixtures/dns_errors.yaml --ignore-not-found')
         Operator.deleteFlowCollector()
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)

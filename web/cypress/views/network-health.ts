@@ -29,10 +29,10 @@ export const networkHealth = {
     navigateToAlertPage: (name: string) => {
         networkHealth.clickOnAlert(name)
         cy.get(networkHealthSelectors.sidePanel).should('be.visible').then(() => {
-            // click the kebab button
-            cy.get('div.rule-details-row:nth-child(1) button').click().then(() => {
-                cy.get('button[role="menuitem"]').eq(1).click().then(() => {
-                    // "No Alert found" should not show up.
+            cy.get('div.rule-details-row').first().find('button').click().then(() => {
+                // verify Runbooks
+                cy.contains('View runbook').should('have.attr', 'href').and('include', 'https');
+                cy.contains('Inspect alert').click().then(() => {
                     cy.byTestID('empty-box').should('not.exist')
                 })
             })
@@ -41,10 +41,8 @@ export const networkHealth = {
     navigateToNetflowTrafficPage: (name: string) => {
         networkHealth.clickOnAlert(name)
         cy.get(networkHealthSelectors.sidePanel).should('be.visible').then(() => {
-            // click the kebab button
-
-            cy.get('div.rule-details-row:nth-child(1) button').click().then(() => {
-                cy.get('button[role="menuitem"]').eq(1).click().then(() => {
+            cy.get('div.rule-details-row').first().find('button').click().then(() => {
+                cy.contains('Inspect network traffic').click().then(() => {
 
                 })
             })
