@@ -15,6 +15,29 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '../../utils/url';
 import { ComponentStatus, ExporterStatus } from './pipeline';
 
+/** `FlowCollector.status` fields used by this form (mirrors operator CRD shape). */
+export type FlowCollectorStatus = {
+  conditions?: K8sResourceCondition[];
+  components?: {
+    agent?: ComponentStatus;
+    processor?: ComponentStatus;
+    plugin?: ComponentStatus;
+  };
+  integrations?: {
+    loki?: ComponentStatus;
+    monitoring?: ComponentStatus;
+    exporters?: ExporterStatus[];
+  };
+};
+
+function flowCollectorStatus(existing: K8sResourceKind | null): FlowCollectorStatus | undefined {
+  const raw = existing?.status;
+  if (raw == null || typeof raw !== 'object') {
+    return undefined;
+  }
+  return raw as FlowCollectorStatus;
+}
+
 export type ResourceStatusProps = {
   group: string;
   version: string;
@@ -135,7 +158,7 @@ const ComponentStatusTable: FC<{
           ))}
           {unusedComponents.length > 0 && (
             <Tr>
-              <Td colSpan={4} style={{ color: 'var(--pf-v5-global--disabled-color--100)', fontStyle: 'italic' }}>
+              <Td colSpan={4} style={{ color: 'var(--pf-t--global--text--color--disabled)', fontStyle: 'italic' }}>
                 {t('Unused: {{list}}', { list: unusedComponents.map(c => c.name).join(', ') })}
               </Td>
             </Tr>
@@ -145,6 +168,68 @@ const ComponentStatusTable: FC<{
     </div>
   );
 };
+
+/**
+ * `Waiting*` FlowCollector conditions use inverted polarity (operator `statuses.go`): `True` means not ready.
+ * Component state on the same status object is the source of truth for Failure / Degraded / InProgress.
+ */
+const WAITING_NO_STATUS_FIELD = new Set(['FlowCollectorController', 'StaticController', 'NetworkPolicy']);
+
+type ConditionTone = 'error' | 'warning' | 'progress' | 'success' | 'unused' | 'unknown';
+
+function waitingComponentState(st: FlowCollectorStatus | undefined, suffix: string): string | undefined {
+  if (!st) return undefined;
+  const { components, integrations } = st;
+  switch (suffix) {
+    case 'EBPFAgents':
+      return components?.agent?.state;
+    case 'WebConsole':
+      return components?.plugin?.state;
+    case 'FLPMonolith':
+    case 'FLPParent':
+    case 'FLPTransformer':
+      return components?.processor?.state;
+    case 'Monitoring':
+      return integrations?.monitoring?.state;
+    case 'LokiStack':
+    case 'DemoLoki':
+      return integrations?.loki?.state;
+    default:
+      return undefined;
+  }
+}
+
+/** One tone per row: drives icon and message color. */
+function conditionTone(c: K8sResourceCondition, fcStatus: FlowCollectorStatus | undefined): ConditionTone {
+  const { type, status, reason } = c;
+
+  if (type === 'ConfigurationIssue') {
+    if (status === 'True' && reason === 'Error') return 'error';
+    if (status === 'True' && reason === 'Warnings') return 'warning';
+    return 'unknown';
+  }
+
+  if (type.startsWith('Waiting')) {
+    const suffix = type.slice('Waiting'.length);
+    if (status === 'False' && reason === 'Ready') return 'success';
+    // Operator `setUnused` sets reason `ComponentUnused`; `toCondition` default is `Unused`.
+    if (status === 'Unknown' && (reason === 'Unused' || reason === 'ComponentUnused')) return 'unused';
+    if (status !== 'True') return 'unknown';
+
+    const st = waitingComponentState(fcStatus, suffix);
+    if (st === 'Failure') return 'error';
+    if (st === 'Degraded') return 'warning';
+    if (st === 'InProgress') return 'progress';
+    if (st === 'Ready') return 'success';
+    return WAITING_NO_STATUS_FIELD.has(suffix) ? 'error' : 'progress';
+  }
+
+  if (type === 'Ready' && status === 'True' && reason === 'Ready,Degraded') return 'warning';
+  if (status === 'True') return 'success';
+  if (status === 'False' && reason === 'Pending') return 'progress';
+  if (status === 'False' && reason !== 'Valid') return 'error';
+  return 'unknown';
+}
 
 export const ResourceStatus: FC<ResourceStatusProps> = ({
   group,
@@ -172,30 +257,32 @@ export const ResourceStatus: FC<ResourceStatusProps> = ({
     );
   }
 
+  const fcStatus = flowCollectorStatus(existing);
+
   const components: ComponentRowData[] = [];
-  if (existing.status?.components?.agent) {
-    components.push({ id: 'agent', name: t('eBPF Agent'), status: existing.status.components.agent });
+  if (fcStatus?.components?.agent) {
+    components.push({ id: 'agent', name: t('eBPF Agent'), status: fcStatus.components.agent });
   }
-  if (existing.status?.components?.processor) {
-    components.push({ id: 'processor', name: t('Flowlogs Pipeline'), status: existing.status.components.processor });
+  if (fcStatus?.components?.processor) {
+    components.push({ id: 'processor', name: t('Flowlogs Pipeline'), status: fcStatus.components.processor });
   }
-  if (existing.status?.components?.plugin) {
-    components.push({ id: 'plugin', name: t('Console Plugin'), status: existing.status.components.plugin });
+  if (fcStatus?.components?.plugin) {
+    components.push({ id: 'plugin', name: t('Console Plugin'), status: fcStatus.components.plugin });
   }
-  if (existing.status?.integrations?.loki) {
-    components.push({ id: 'loki', name: 'Loki', status: existing.status.integrations.loki });
+  if (fcStatus?.integrations?.loki) {
+    components.push({ id: 'loki', name: 'Loki', status: fcStatus.integrations.loki });
   }
-  if (existing.status?.integrations?.monitoring) {
-    components.push({ id: 'monitoring', name: t('Monitoring'), status: existing.status.integrations.monitoring });
+  if (fcStatus?.integrations?.monitoring) {
+    components.push({ id: 'monitoring', name: t('Monitoring'), status: fcStatus.integrations.monitoring });
   }
-  const exporters: ExporterStatus[] = existing.status?.integrations?.exporters || [];
+  const exporters: ExporterStatus[] = fcStatus?.integrations?.exporters || [];
 
   const sortConditions = [
     (c: K8sResourceCondition) => c.type === 'Ready',
     (c: K8sResourceCondition) => c.type === 'ConfigurationIssue',
     (c: K8sResourceCondition) => c.type === 'KafkaReady'
   ];
-  const conditions = ((existing?.status?.conditions || []) as K8sResourceCondition[]).sort((a, b) => {
+  const conditions = (fcStatus?.conditions || []).sort((a, b) => {
     for (const pred of sortConditions) {
       if (pred(a) && pred(b)) {
         return 0;
@@ -232,16 +319,7 @@ export const ResourceStatus: FC<ResourceStatusProps> = ({
         </Thead>
         <Tbody>
           {conditions.map((condition, i) => {
-            const isWarning =
-              condition.type === 'ConfigurationIssue' && condition.status === 'True' && condition.reason === 'Warnings';
-            const isError =
-              (condition.type === 'ConfigurationIssue' &&
-                condition.status === 'True' &&
-                condition.reason === 'Error') ||
-              (condition.type !== 'ConfigurationIssue' &&
-                condition.status === 'False' &&
-                condition.reason !== 'Pending' &&
-                condition.reason !== 'Valid');
+            const tone = conditionTone(condition, fcStatus);
             return (
               <Tr
                 id={`${condition.type}-row`}
@@ -250,14 +328,16 @@ export const ResourceStatus: FC<ResourceStatusProps> = ({
                 key={i}
               >
                 <Td>
-                  {isError ? (
+                  {tone === 'error' ? (
                     <ExclamationCircleIcon color="var(--pf-v5-global--danger-color--100)" />
-                  ) : isWarning ? (
+                  ) : tone === 'warning' ? (
                     <ExclamationTriangleIcon color="var(--pf-v5-global--warning-color--100)" />
-                  ) : condition.status === 'True' && condition.type !== 'ConfigurationIssue' ? (
-                    <CheckCircleIcon color="var(--pf-v5-global--success-color--100)" />
-                  ) : condition.status === 'False' && condition.reason === 'Pending' ? (
+                  ) : tone === 'progress' ? (
                     <HourglassHalfIcon color="var(--pf-v5-global--info-color--100)" />
+                  ) : tone === 'unused' ? (
+                    <BanIcon color="var(--pf-v5-global--disabled-color--100)" />
+                  ) : tone === 'success' ? (
+                    <CheckCircleIcon color="var(--pf-v5-global--success-color--100)" />
                   ) : (
                     <UnknownIcon color="var(--pf-v5-global--disabled-color--100)" />
                   )}{' '}
@@ -267,9 +347,9 @@ export const ResourceStatus: FC<ResourceStatusProps> = ({
                 <Td>{condition.reason}</Td>
                 <Td
                   style={
-                    isWarning
+                    tone === 'warning'
                       ? { color: 'var(--pf-v5-global--warning-color--200)' }
-                      : isError
+                      : tone === 'error'
                       ? { color: 'var(--pf-v5-global--danger-color--100)' }
                       : undefined
                   }
