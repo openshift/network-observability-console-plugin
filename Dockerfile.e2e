@@ -5,7 +5,10 @@ FROM cypress/included:13.6.5
 
 # Install additional dependencies
 USER root
-RUN apt-get update && apt-get install -y \
+RUN rm -f /etc/apt/sources.list.d/google-chrome.list \
+          /etc/apt/sources.list.d/microsoft-edge.list \
+          /etc/apt/sources.list.d/microsoft-edge-stable.list && \
+    apt-get update && apt-get install -y \
     curl \
     jq \
     apache2-utils \
