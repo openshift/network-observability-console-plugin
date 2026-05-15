@@ -27,15 +27,15 @@ describe.skip('(OCP-67617) User in group with cluster-admin role', { tags: ['Net
         cy.visit('/netflow-traffic')
         // validate user is not able to access netflow traffic page
         // overview shows no panels
-        cy.get('li.overviewTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Overview').click()
         cy.get("#overview-flex").should('not.exist')
 
         // table view shows no grid
-        cy.get('li.tableTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('not.exist')
 
         // topology view shows no view
-        cy.get('li.topologyTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Topology').click()
         cy.byTestID("error-state").should('exist')
     })
 

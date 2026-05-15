@@ -1,0 +1,21 @@
+kind: FlowCollector
+apiVersion: flows.netobserv.io/v1beta2
+metadata:
+  name: cluster
+spec:
+  agent:
+    ebpf:
+      sampling: 1
+      features:
+        - TLSTracking
+    type: eBPF
+  loki:
+    enable: true
+    mode: Monolithic
+    namespace: netobserv
+    monolithic:
+      installDemoLoki: true
+  processor:
+    metrics:
+      additionalIncludeList:
+        - workload_tls_flows_total

@@ -6,6 +6,7 @@ declare global {
             checkPanel(panelName: string[]): Chainable<Element>
             openPanelsModal(): Chainable<Element>
             openColumnsModal(): Chainable<Element>
+            selectAndVerifyColumns(columnSelectors: string[]): Chainable<Element>
             checkPopItems(id: string, names: string[]): Chainable<Element>
             checkQuerySummary(metric: JQuery<HTMLElement>): Chainable<Element>
             checkPerformance(page: string, loadTime: number, memoryUsage: number): Chainable<Element>
@@ -35,8 +36,10 @@ export const netflowPage = {
         // set the page to auto refresh
         netflowPage.setAutoRefresh()
 
-        cy.byTestID('no-results-found').should('not.exist')
-        cy.get('#overview-container').should('exist')
+        netflowPage.waitForLokiQuery()
+
+        cy.byTestID('no-results-found', { timeout: 30000 }).should('not.exist')
+        cy.get('#overview-container', { timeout: 30000 }).should('exist')
     },
     setAutoRefresh: () => {
         cy.byTestID(genSelectors.refreshDrop).should('exist').invoke('text').then((text) => {
@@ -172,39 +175,43 @@ export namespace genSelectors {
     export const fullScreen = '[data-test=fullscreen-button]'
 }
 
-// Helper function to generate table header column selectors
-const thCol = (columnId: string): string => `[data-test=th-${columnId}] button`;
-
 export namespace colSelectors {
     export const columnsModal = '#columns-modal'
     export const save = 'columns-save-button'
     export const resetDefault = 'columns-reset-button'
-    export const mac = thCol('Mac')
-    export const k8sOwner = thCol('K8S_OwnerObject')
-    export const ipPort = thCol('AddrPort')
-    export const protocol = thCol('Proto')
-    export const icmpType = thCol('IcmpType')
-    export const icmpCode = thCol('IcmpCode')
-    export const srcNodeIP = thCol('SrcK8S_HostIP')
-    export const srcNS = thCol('SrcK8S_Namespace')
-    export const dstNodeIP = thCol('DstK8S_HostIP')
-    export const direction = thCol('FlowDirection')
-    export const bytes = thCol('Bytes')
-    export const packets = thCol('Packets')
-    export const recordType = thCol('RecordType')
-    export const conversationID = thCol('_HashId')
-    export const flowRTT = thCol('TimeFlowRttMs')
-    export const dscp = thCol('Dscp')
-    export const dnsLatency = thCol('DNSLatency')
-    export const dnsResponseCode = thCol('DNSResponseCode')
-    export const dnsId = thCol('DNSId')
-    export const dnsError = thCol('DNSErrNo')
-    export const dnsName = thCol('DNSName')
-    export const srcZone = thCol('SrcZone')
-    export const dstZone = thCol('DstZone')
-    export const clusterName = thCol('ClusterName')
-    export const srcNetworkName = thCol('SrcNetworkName')
-    export const dstNetworkName = thCol('DstNetworkName')
+    export const mac = '#Mac'
+    export const k8sOwner = '#K8S_OwnerObject'
+    export const ipPort = '#AddrPort'
+    export const protocol = '#Proto'
+    export const icmpType = '#IcmpType'
+    export const icmpCode = '#IcmpCode'
+    export const srcNodeIP = '#SrcK8S_HostIP'
+    export const srcNS = '#SrcK8S_Namespace'
+    export const dstNodeIP = '#DstK8S_HostIP'
+    export const direction = '#FlowDirection'
+    export const bytes = '#Bytes'
+    export const packets = '#Packets'
+    export const recordType = '#RecordType'
+    export const conversationID = '#_HashId'
+    export const startTime = '#StartTime'
+    export const flowRTT = '#TimeFlowRttMs'
+    export const dscp = '#Dscp'
+    export const dnsLatency = '#DNSLatency'
+    export const dnsResponseCode = '#DNSResponseCode'
+    export const dnsId = '#DNSId'
+    export const dnsError = '#DNSErrNo'
+    export const dnsName = '#DNSName'
+    export const srcZone = '#SrcZone'
+    export const dstZone = '#DstZone'
+    export const clusterName = '#ClusterName'
+    export const srcNetworkName = '#SrcNetworkName'
+    export const dstNetworkName = '#DstNetworkName'
+    export const srcSubnetLabel = '#SrcSubnetLabel'
+    export const dstSubnetLabel = '#DstSubnetLabel'
+    export const tlsVersion = '#TLSVersion'
+    export const tlsCipherSuite = '#TLSCipherSuite'
+    export const tlsGroup = '#TLSGroup'
+    export const tlsTypes = '#TLSTypes'
 }
 
 export namespace filterSelectors {
@@ -268,14 +275,17 @@ export namespace overviewSelectors {
     export const managePacketDropPanelsList = ['Top X packet dropped state stacked with total (donut or bars and lines)', 'Top X packet dropped cause stacked with total (donut or bars and lines)', 'Top X average dropped bytes rates (donut)', 'Top X dropped bytes rates stacked with total (bars and lines)', 'Top X average dropped packets rates (donut)', 'Top X dropped packets rates stacked with total (bars and lines)']
     export const manageDNSTrackingPanelsList = ['Top X DNS response code with total (donut or bars and lines)', 'Top X average DNS latencies with overall (donut or lines)', 'Bottom X minimum DNS latencies with overall (donut or lines)', 'Top X maximum DNS latencies with overall (donut or lines)', 'Top X 90th percentile DNS latencies with overall (donut or lines)']
     export const manageFlowRTTPanelsList = ['Top X average TCP smoothed Round Trip Time with overall (donut or lines)', 'Bottom X minimum TCP smoothed Round Trip Time with overall (donut or lines)', 'Top X maximum TCP smoothed Round Trip Time with overall (donut or lines)', 'Top X 90th percentile TCP smoothed Round Trip Time with overall (donut or lines)', 'Top X 99th percentile TCP smoothed Round Trip Time with overall (donut or lines)']
+    export const manageTLSTrackingPanelsList = ['TLS usage (donut or lines)', 'TLS usage per version (donut or lines)', 'TLS usage per group (donut or lines)', 'TLS usage per cipher suite (donut or lines)']
     export const defaultPanels = ['Top 5 average bytes rates', 'Top 5 bytes rates stacked with total']
     export const defaultPacketDropPanels = ['Top 5 packet dropped state stacked with total', 'Top 5 packet dropped cause stacked with total', 'Top 5 average dropped packets rates', 'Top 5 dropped packets rates stacked with total']
     export const defaultDNSTrackingPanels = ['Top 5 DNS response code', 'Top 5 average DNS latencies with overall', 'Top 5 90th percentile DNS latencies']
     export const defaultFlowRTTPanels = ['Top 5 average TCP smoothed Round Trip Time with overall', 'Bottom 5 minimum TCP smoothed Round Trip Time', 'Top 5 90th percentile TCP smoothed Round Trip Time']
+    export const defaultTLSTrackingPanels = ['TLS usage (network flows per second)', 'TLS per version (network flows per second)']
     export const allPanels = defaultPanels.concat(['Top 5 average packets rates', 'Top 5 packets rates'])
     export const allPacketDropPanels = defaultPacketDropPanels.concat(['Top 5 average dropped bytes rates', 'Top 5 dropped bytes rates stacked with total'])
     export const allDNSTrackingPanels = defaultDNSTrackingPanels.concat(['Bottom 5 minimum DNS latencies', 'Top 5 maximum DNS latencies', 'Top 5 DNS name'])
     export const allFlowRTTPanels = defaultFlowRTTPanels.concat(['Top 5 maximum TCP smoothed Round Trip Time', 'Top 5 99th percentile TCP smoothed Round Trip Time'])
+    export const allTLSTrackingPanels = defaultTLSTrackingPanels.concat(['TLS per group (network flows per second)', 'TLS per cipher suite (network flows per second)'])
 }
 
 export const loadTimes = {
@@ -329,6 +339,31 @@ Cypress.Commands.add('openColumnsModal', () => {
     cy.get('#table-column-management').should('exist');
 });
 
+Cypress.Commands.add('selectAndVerifyColumns', (columnSelectors: string[]) => {
+    // Open the columns modal
+    cy.openColumnsModal().then(() => {
+        cy.get(colSelectors.columnsModal).should('be.visible');
+
+        // Check each column
+        columnSelectors.forEach(selector => {
+            cy.get(selector).check();
+        });
+
+        // Save the modal
+        cy.byTestID(colSelectors.save).click();
+    });
+
+    // Reload to verify column selection persists
+    cy.reload();
+
+    // Verify columns appear in table after reload
+    cy.byTestID('table-composable').should('exist').within(() => {
+        columnSelectors.forEach(selector => {
+            cy.get(selector).should('exist');
+        });
+    });
+});
+
 Cypress.Commands.add('checkQuerySummary', (metric) => {
     // parseFloat handles formats: "123 ms", "123+ ms", "1.5k ms", "1.5k+ ms"
     const num = parseFloat(metric.text())
@@ -354,7 +389,8 @@ Cypress.Commands.add('visitNetflowTrafficTab', (page) => {
 
 Cypress.Commands.add('checkNetflowTraffic', (loki = "Enabled") => {
     // overview panels
-    cy.get('li.overviewTabButton').should('exist').click({ force: true })
+    cy.get('#tabs-container').contains('Overview').click({ force: true })
+    netflowPage.waitForLokiQuery()
     cy.checkPanel(overviewSelectors.defaultPanels)
 
     // table view
@@ -363,13 +399,13 @@ Cypress.Commands.add('checkNetflowTraffic', (loki = "Enabled") => {
         cy.get('li.tableTabButton').should('exist').should('have.class', 'pf-m-disabled')
     }
     else {
-        cy.get('li.tableTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.wait(1000)
         cy.byTestID("table-composable", { timeout: 60000 }).should('exist')
     }
 
     // topology view
-    cy.get('li.topologyTabButton').should('exist').click()
+    cy.get('#tabs-container').contains('Topology').click()
     cy.wait(2000)
     cy.get('#drawer', { timeout: 60000 }).should('not.be.empty')
 });

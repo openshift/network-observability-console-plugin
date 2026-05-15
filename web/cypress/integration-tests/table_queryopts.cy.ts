@@ -84,16 +84,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table Query Optio
 
     it("(OCP-68125, aramesha) should verify DSCP column", function () {
         netflowPage.stopAutoRefresh()
-        cy.openColumnsModal().then(col => {
-            cy.get(colSelectors.columnsModal).should('be.visible')
-            cy.get('#Dscp').check()
-            cy.byTestID(colSelectors.save).click()
-        })
-        cy.reload()
-
-        cy.byTestID('table-composable').should('exist').within(() => {
-            cy.get(colSelectors.dscp).should('exist')
-        })
+        cy.selectAndVerifyColumns([colSelectors.dscp])
 
         // filter on DSCP values
         cy.get(filterSelectors.filterInput).type("dscp=0" + '{enter}').click()

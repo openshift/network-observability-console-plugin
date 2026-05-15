@@ -21,12 +21,10 @@ describe('(OCP-67615, OCP-72874) Return external traffic and custom subnet label
         cy.byTestID("table-composable").should('exist')
 
         // enable SrcSubnetLabel and DstSubnetLabel columns
-        cy.openColumnsModal().then(col => {
-            cy.get(colSelectors.columnsModal).should('be.visible')
-            cy.get('#SrcSubnetLabel').check()
-            cy.get('#DstSubnetLabel').check()
-            cy.byTestID(colSelectors.save).click()
-        })
+        cy.selectAndVerifyColumns([
+            colSelectors.srcSubnetLabel,
+            colSelectors.dstSubnetLabel
+        ])
 
         // filter on SrcSubnetLabel Pods and DstIP 52.200.142.250
         cy.get(filterSelectors.filterInput).type("src_subnet_label=Pods" + '{enter}')

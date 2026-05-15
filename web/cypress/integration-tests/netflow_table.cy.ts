@@ -57,21 +57,21 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table view tests'
         netflowPage.stopAutoRefresh()
         cy.openColumnsModal().then(col => {
             cy.get(colSelectors.columnsModal).should('be.visible')
-            cy.get('#K8S_OwnerObject').check()
-            cy.get('#AddrPort').check()
+            cy.get(colSelectors.k8sOwner).check()
+            cy.get(colSelectors.ipPort).check()
 
-            cy.get('#Mac').should('exist').check()
-            cy.get('#FlowDirection').should('exist').check()
+            cy.get(colSelectors.mac).should('exist').check()
+            cy.get(colSelectors.direction).should('exist').check()
             // ICMP related columns
-            cy.get('#IcmpType').should('exist').check()
-            cy.get('#IcmpCode').should('exist').check()
+            cy.get(colSelectors.icmpType).should('exist').check()
+            cy.get(colSelectors.icmpCode).should('exist').check()
 
             // source columns 
-            cy.get('#SrcK8S_HostIP').check()
+            cy.get(colSelectors.srcNodeIP).check()
             cy.get('#SrcK8S_Namespace[type="checkbox"]').uncheck()
 
             // dest columns
-            cy.get('#DstK8S_HostIP').check()
+            cy.get(colSelectors.dstNodeIP).check()
 
             cy.byTestID(colSelectors.save).click()
         })
@@ -170,11 +170,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table view tests'
             cy.contains('Display options').should('exist').click()
             cy.byTestID('size-s').click()
             cy.contains('Display options').should('exist').click()
-            cy.openColumnsModal().then(col => {
-                cy.get(colSelectors.columnsModal).should('be.visible')
-                cy.get('#StartTime').check()
-                cy.byTestID(colSelectors.save).click()
-            })
+            cy.selectAndVerifyColumns([colSelectors.startTime])
             cy.byTestID("show-view-options-button").should('exist').click()
         })
 
@@ -267,7 +263,7 @@ describe('(OCP-50532, OCP-50531, OCP-50530, OCP-59408) Netflow Table view tests'
         cy.byTestID("show-histogram-button").should('exist').click().then(() => {
             cy.get('#time-range-dropdown-dropdown').should('exist').click()
             cy.get("#5m").should("exist").click()
-            cy.byTestID("refresh-dropdown-dropdown").should('exist').should('not.be.disabled')
+            cy.byTestID(genSelectors.refreshDrop).should('exist').should('not.be.disabled')
         })
     })
 
