@@ -28,7 +28,7 @@ jobs:
     - name: check clean vendors
       run: go mod vendor
     - name: Report coverage
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       with:
         files: ./cover.out
         flags: unittests
@@ -52,7 +52,7 @@ jobs:
     - name: build and test
       run: make frontend && git diff --exit-code
     - name: Report coverage
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       with:
         files: ./web/coverage/cobertura-coverage.xml
         flags: uitests
