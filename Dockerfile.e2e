@@ -44,20 +44,16 @@ RUN mkdir -p gui_test_screenshots/cypress/screenshots \
     chmod -R 777 gui_test_screenshots cypress/results
 
 # Set environment variables
-ENV CYPRESS_CACHE_FOLDER=/tmp/.cache/Cypress
 ENV HOME=/tmp
 ENV NO_COLOR=1
+ENV WEB_DIR=/opt/app-root/web
 
-# Make cache directory writable for OpenShift arbitrary UIDs
-RUN mkdir -p /tmp/.cache/Cypress && chmod -R 777 /tmp
+RUN mkdir -p /root/.cache/Cypress /tmp && \
+    chmod 1777 /tmp && \
+    chmod -R g+rwX /root/.cache/Cypress
 
-# Create a non-root user for OpenShift compatibility
-RUN useradd -u 1001 -r -g 0 -m -d /tmp -s /sbin/nologin \
-    -c "Default Application User" default && \
-    chown -R 1001:0 /opt/app-root && \
-    chmod -R g+rwX /opt/app-root /tmp
-
-USER 1001
+# Make directories writable for OpenShift arbitrary UIDs (group 0)
+RUN chmod -R g+rwX /opt/app-root
 
 WORKDIR /opt/app-root
 
