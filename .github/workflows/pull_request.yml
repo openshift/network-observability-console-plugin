@@ -42,7 +42,7 @@ jobs:
     - name: install make
       run: sudo apt-get install make
     - name: set up node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v6
       with:
         node-version: 18
     - name: checkout
