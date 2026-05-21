@@ -67,22 +67,13 @@ describe('(OCP-67087 Network_Observability) DNSTracking test', { tags: ['Network
         cy.get('#search').type(dns_name + '{enter}')
 
         // select DNS Id, DNS Error and DNS Name columns
-        cy.openColumnsModal()
-        cy.get(colSelectors.columnsModal).should('be.visible')
-        cy.get('#DNSId').check()
-        cy.get('#DNSErrNo').check()
-        cy.get('#DNSName').check()
-        cy.byTestID(colSelectors.save).click()
-        cy.reload()
+        cy.selectAndVerifyColumns([
+            colSelectors.dnsId,
+            colSelectors.dnsError,
+            colSelectors.dnsName
+        ])
 
-        // verify they are visible in table view
-        cy.byTestID('table-composable').should('exist').within(() => {
-            cy.get(colSelectors.dnsId).should('exist')
-            cy.get(colSelectors.dnsError).should('exist')
-            cy.get(colSelectors.dnsName).should('exist')
-        })
-
-        // Verify DNSName column for all rows
+        // Verify DNSName value for all rows
         cy.get('[data-test-td-column-id="DNSName"]').each((td) => {
             expect(td).to.contain(`${dns_name}`)
         })

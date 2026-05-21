@@ -52,7 +52,7 @@ const FIXTURE_PATHS = {
 
 export const Operator = {
     name: () => {
-        if (`${Cypress.env('NOO_CATALOG_SOURCE')}` == "upstream") {
+        if (`${Cypress.env('NOO_CATALOG_SOURCE')}` === "upstream") {
             return "NetObserv Operator"
         }
         else {
@@ -64,7 +64,7 @@ export const Operator = {
         let catalogImg: string
         let catalogSource: string
 
-        if (catSrc == "upstream") {
+        if (catSrc === "upstream") {
             catalogImg = catSrcImage ? catSrcImage : DEFAULT_UPSTREAM_IMAGE
             catalogSource = "netobserv-test"
             catalogDisplayName = "NetObserv QE"
@@ -81,52 +81,51 @@ export const Operator = {
         return catalogSource
     },
     install: () => {
-        if (`${Cypress.env('SKIP_NOO_INSTALL')}` == "true") {
+        if (`${Cypress.env('SKIP_NOO_INSTALL')}` === "true") {
             return null
         }
-        var catalogSource = Operator.install_catalogsource()
+        // Check operator status via CLI
+        cy.adminCLI('oc get csv -n openshift-netobserv-operator --no-headers -o custom-columns=":metadata.name" 2>/dev/null || echo "NotFound"')
+            .then((result: any) => {
+                const stdout = result.stdout ? result.stdout.trim() : ''
+                const csvName = stdout.split('\n').find((line: string) =>
+                    line.includes('netobserv-operator') || line.includes('network-observability-operator')
+                )
 
-        cy.visit(`/k8s/ns/openshift-netobserv-operator/operators.coreos.com~v1alpha1~ClusterServiceVersion`);
-        cy.reload()
-        // if user still does not have admin access
-        // try few more times
-        cy.contains("openshift-netobserv-operator").should('be.visible')
+                if (csvName && !stdout.includes('NotFound') && !stdout.includes('No resources found')) {
+                    // CSV exists, check if it's in Succeeded state
+                    cy.adminCLI(`oc wait csv ${csvName.trim()} -n openshift-netobserv-operator --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s`)
+                        .then(() => {
+                            cy.log('NetObserv Operator already installed')
+                        })
+                } else {
+                    cy.log('Installing NetObserv Operator')
+                    var catalogSource = Operator.install_catalogsource()
 
-        const waitForAccess = (retries = 15) => {
-            cy.get("div.loading-box").should('be.visible')
-            cy.document().then(doc => {
-                if (doc.querySelectorAll('.co-disabled').length > 0 && retries > 0) {
-                    cy.log(`user does not have access, retries left: ${retries}`)
-                    cy.wait(5000)
-                    cy.reload(true)
-                    waitForAccess(retries - 1)
+                    if (catSrc === "upstream") {
+                        // metrics checkbox is not available for upstream operators
+                        operatorHubPage.install("netobserv-operator", catalogSource, false)
+                    } else {
+                        operatorHubPage.install("netobserv-operator", catalogSource, true)
+                    }
                 }
             })
-        }
-        waitForAccess()
-        // don't install operator if its already installed
-        cy.get("div.loading-box").should('be.visible').then(loading => {
-            if (Cypress.$('td[role="gridcell"]').length == 0) {
-                if (catSrc == "upstream") {
-                    // metrics checkbox is not available for upstream operators
-                    operatorHubPage.install("netobserv-operator", catalogSource, false)
-                } else {
-                    operatorHubPage.install("netobserv-operator", catalogSource, true)
-                }
-            }
-        })
     },
     visitFlowcollector: () => {
-        cy.visit('k8s/ns/openshift-netobserv-operator/operators.coreos.com~v1alpha1~ClusterServiceVersion')
-        const selector = '[data-test-operator-row="' + Operator.name() + '"]'
-        cy.get(selector).invoke('attr', 'href').then(href => {
-            cy.visit(href as string)
-            cy.reload()
-        })
+        cy.adminCLI('oc get csv -n openshift-netobserv-operator --no-headers -o custom-columns=":metadata.name" 2>/dev/null || echo "NotFound"')
+            .then((result: any) => {
+                const stdout = result.stdout ? result.stdout.trim() : ''
+                const csvName = stdout.split('\n').find((line: string) =>
+                    line.includes('netobserv-operator') || line.includes('network-observability-operator')
+                )
 
-        cy.contains('Flow Collector').invoke('attr', 'href').then(href => {
-            cy.visit(href as string)
-        })
+                if (csvName && !stdout.includes('NotFound') && !stdout.includes('No resources found')) {
+                    cy.visit(`/k8s/ns/openshift-netobserv-operator/operators.coreos.com~v1alpha1~ClusterServiceVersion/${csvName.trim()}/flows.netobserv.io~v1beta2~FlowCollector`)
+                    cy.get('div.loading-box__loaded', { timeout: 30000 }).should('exist')
+                } else {
+                    throw new Error('NetObserv CSV not found')
+                }
+            })
     },
     createFlowcollector: (parameters?: FlowCollectorParameter) => {
         Operator.visitFlowcollector()
@@ -141,7 +140,7 @@ export const Operator = {
         })
         // don't create flowcollector if already exists
         cy.get('div.loading-box:nth-child(1)').should('be.visible').then(() => {
-            if (Cypress.$('td[role="gridcell"]').length == 0) {
+            if (Cypress.$('td[role="gridcell"]').length === 0) {
                 cy.log("Deploying flowcollector")
                 switch (parameters) {
                     case "PacketDrop":
@@ -184,8 +183,11 @@ export const Operator = {
                 if (parameters !== "LokiDisabled") {
                     cy.adminCLI(`oc wait --for=condition=Ready pod -l app=loki -n ${project} --timeout=180s`)
                 }
-                Operator.visitFlowcollector()
-                cy.byTestID('status-text', { timeout: 120000 }).should('exist').should('contain.text', 'Ready')
+                // Check FlowCollector status and wait for plugin pod to be Ready
+                cy.contains('tr', 'cluster').within(() => {
+                    cy.byTestID('status-text', { timeout: 60000 }).should('contain.text', 'Ready')
+                })
+                cy.adminCLI(`oc wait --for=condition=Ready pod -l app=netobserv-plugin -n ${project} --timeout=180s`)
             }
         })
     },

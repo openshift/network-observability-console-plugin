@@ -4,6 +4,11 @@ import { netflowPage } from "@views/netflow-page"
 describe('(OCP-67617 Network_Observability) User in group with cluster-admin role', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
+        // Skip this test suite if using kubeadmin (LOGIN_IDP is 'kube:admin')
+        if (Cypress.env('LOGIN_IDP') === 'kube:admin') {
+            this.skip()
+        }
+
         // create new group, add user to that group and give that group cluster-admin role
         cy.adminCLI(`oc adm groups new netobservadmins`)
         cy.adminCLI(`oc adm groups add-users netobservadmins ${Cypress.env('LOGIN_USERNAME')}`)
@@ -26,19 +31,24 @@ describe('(OCP-67617 Network_Observability) User in group with cluster-admin rol
         cy.visit('/netflow-traffic')
         // validate user is not able to access netflow traffic page
         // overview shows no panels
-        cy.get('li.overviewTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Overview').click()
         cy.get("#overview-flex").should('not.exist')
 
         // table view shows no grid
-        cy.get('li.tableTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.byTestID("table-composable").should('not.exist')
 
         // topology view shows no view
-        cy.get('li.topologyTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Topology').click()
         cy.byTestID("error-state").should('exist')
     })
 
     after("all tests", function () {
+        // Skip cleanup if using kubeadmin
+        if (Cypress.env('LOGIN_IDP') === 'kube:admin') {
+            return
+        }
+
         cy.adminCLI(`oc adm groups remove-users netobservadmins ${Cypress.env('LOGIN_USERNAME')}`)
         cy.adminCLI(`oc delete groups netobservadmins`)
         cy.uiLogout()

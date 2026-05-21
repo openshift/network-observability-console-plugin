@@ -1,19 +1,25 @@
-apiVersion: template.openshift.io/v1
-kind: Template
+---
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: netobserv-test-client-server
-objects:
-  - kind: Namespace
-    apiVersion: v1
+  name: test-server-56222
+  labels:
+    name: test-server-56222
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: test-server-56222
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
     metadata:
-      name: ${SERVER_NS}
-      labels:
-        name: ${SERVER_NS}
-  - apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: nginx
-      namespace: ${SERVER_NS}
       labels:
         app: nginx
     spec:
@@ -21,74 +27,61 @@ objects:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      replicas: 1
-      selector:
-        matchLabels:
-          app: nginx
-      template:
-        metadata:
-          labels:
-            app: nginx
-        spec:
-          containers:
-            - name: nginx
-              securityContext:
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop: ["ALL"]
-                  privileged: false
-              image: quay.io/openshifttest/nginx-alpine:1.2.3
-              imagePullPolicy: IfNotPresent
-              ports:
-                - containerPort: 8080
-  - apiVersion: v1
-    kind: Service
-    metadata:
-      namespace: ${SERVER_NS}
-      name: nginx-service
-    spec:
-      selector:
-        app: nginx
-      type: NodePort
-      ports:
-        - protocol: TCP
-          port: 80
-          targetPort: 8080
-  - kind: Namespace
-    apiVersion: v1
-    metadata:
-      name: ${CLIENT_NS}
-      labels:
-        name: ${CLIENT_NS}
-  - apiVersion: v1
-    kind: Pod
-    metadata:
-      creationTimestamp: null
-      labels:
-        run: client
-      name: client
-      namespace: ${CLIENT_NS}
-    spec:
       containers:
-        - command:
-            - sh
-            - -c
-            - "
-              \  while : ; do\n
-              \        curl nginx-service.${SERVER_NS}.svc:80/data/100K  2>&1 >  /dev/null ; sleep 5 \n
-              \  done"
-          image: quay.io/openshifttest/hello-openshift:1.2.0
+        - name: nginx
+          image: quay.io/openshifttest/nginx-alpine:1.2.3
+          imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-              privileged: false
-            runAsNonRoot: true
-            seccompProfile:
-              type: RuntimeDefault
-          name: client
-parameters:
-  - name: SERVER_NS
-    value: test-server
-  - name: CLIENT_NS
-    value: test-client
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: test-server-56222
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-client-56222
+  labels:
+    name: test-client-56222
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: client
+  name: client
+  namespace: test-client-56222
+spec:
+  containers:
+    - name: client
+      image: quay.io/openshifttest/hello-openshift:1.2.0
+      command:
+        - sh
+        - -c
+        - |
+          while : ; do
+            curl nginx-service.test-server-56222.svc:80/data/100K 2>&1 > /dev/null
+            sleep 5
+          done
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
