@@ -31,9 +31,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WEB_DIR="${SCRIPT_DIR}/../web"
+# Configuration — use WEB_DIR env var if set, otherwise detect from script location
+if [ -z "${WEB_DIR:-}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    WEB_DIR="${SCRIPT_DIR}/../web"
+fi
 RESULTS_DIR="${WEB_DIR}/cypress/results"
 SCREENSHOTS_DIR="${WEB_DIR}/gui_test_screenshots"
 
@@ -235,17 +237,13 @@ BROWSER="${CYPRESS_BROWSER:-chrome}"
 
 # Build cypress run command arguments
 CYPRESS_ARGS=(
+    --spec "${SPEC_FILES:-cypress/integration-tests/**/*.cy.ts}"
     --env "grepTags=${GREP_TAGS}"
     --browser "${BROWSER}"
     --headless
     --reporter cypress-multi-reporters
     --reporter-options configFile=reporter-config.json
 )
-
-# Add --spec option if spec files are provided
-if [ -n "${SPEC_FILES}" ]; then
-    CYPRESS_ARGS+=(--spec "${SPEC_FILES}")
-fi
 
 # Run tests and capture exit code
 set +e
