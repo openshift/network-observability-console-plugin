@@ -9,7 +9,7 @@ import { Config, defaultConfig } from './config';
 export interface FetchCallbacks {
   metricsRef: React.MutableRefObject<NetflowMetrics>;
   setFlows: (v: Record[]) => void;
-  setMetrics: (v: NetflowMetrics) => void;
+  setMetrics: React.Dispatch<React.SetStateAction<NetflowMetrics>>;
   setError: (err?: StructuredError | string) => void;
 }
 

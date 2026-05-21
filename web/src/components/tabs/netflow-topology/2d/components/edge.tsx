@@ -21,10 +21,11 @@ import {
   TOP_LAYER as topLayer,
   useHover
 } from '@patternfly/react-topology';
-import DefaultConnectorTag from '@patternfly/react-topology/dist/esm/components/edges/DefaultConnectorTag';
 import { getConnectorStartPoint } from '@patternfly/react-topology/dist/esm/components/edges/terminals/terminalUtils';
 import styles from '@patternfly/react-topology/src/css/topology-components';
 import * as React from 'react';
+import type { TlsLockSeverity } from '../../../../../utils/tls-lock-severity';
+import TopologyConnectorTag from './topology-connector-tag';
 
 interface DefaultEdgeProps {
   /** Additional content added to the edge */
@@ -61,6 +62,12 @@ interface DefaultEdgeProps {
   tagClass?: string;
   /** The status to indicate on the tag */
   tagStatus?: NodeStatus;
+  /** When true, show a lock icon on the edge tag (TLS observed on aggregated flows). */
+  tagTlsSecure?: boolean;
+  /** Closed-lock color tier from TLSVersion labels (deprecated / legacy / modern / unknown). */
+  tagTlsLockSeverity?: TlsLockSeverity;
+  /** Open-lock hint when no TLS in aggregated logs (optional; from edge data if set). */
+  tagTlsCleartext?: boolean;
   /** Function to call for showing a remove indicator on the edge. Part of WithRemoveConnectorProps  */
   onShowRemoveConnector?: () => void;
   /** Function to call for removing the remove indicator on the edge. Part of WithRemoveConnectorProps  */
@@ -111,6 +118,9 @@ const DefaultEdgeInner: React.FunctionComponent<DefaultEdgeInnerProps> = observe
     tag,
     tagClass,
     tagStatus,
+    tagTlsSecure,
+    tagTlsLockSeverity,
+    tagTlsCleartext,
     children,
     className,
     selected,
@@ -184,7 +194,7 @@ const DefaultEdgeInner: React.FunctionComponent<DefaultEdgeInnerProps> = observe
       .map((b: Point) => `L${b.x} ${b.y} `)
       .join('')}L${bgEndPoint[0]} ${bgEndPoint[1]}`;
 
-    const showTag = tag && (detailsLevel === ScaleDetailsLevel.high || hover);
+    const showTag = (tag || tagTlsSecure || tagTlsCleartext) && (detailsLevel === ScaleDetailsLevel.high || hover);
     const scale = element.getGraph().getScale();
     const tagScale = hover && !(detailsLevel === ScaleDetailsLevel.high) ? Math.max(1, 1 / scale) : 1;
     const tagPositionScale = hover && !(detailsLevel === ScaleDetailsLevel.high) ? Math.min(1, scale) : 1;
@@ -207,12 +217,15 @@ const DefaultEdgeInner: React.FunctionComponent<DefaultEdgeInnerProps> = observe
           <path className={linkClassName} d={d} style={{ animationDuration: `${edgeAnimationDuration}s` }} />
           {showTag && (
             <g transform={`scale(${hover ? tagScale : 1})`}>
-              <DefaultConnectorTag
+              <TopologyConnectorTag
                 className={tagClass}
                 startPoint={element.getStartPoint().scale(tagPositionScale)}
                 endPoint={element.getEndPoint().scale(tagPositionScale)}
-                tag={tag}
+                tag={tag || ''}
                 status={tagStatus}
+                showLeadingLock={tagTlsSecure}
+                showCleartextLock={tagTlsCleartext}
+                lockSeverity={tagTlsLockSeverity}
               />
             </g>
           )}

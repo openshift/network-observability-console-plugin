@@ -303,6 +303,7 @@ export const NetflowTrafficDrawer = React.forwardRef<NetflowTrafficDrawerHandle,
                   scopes={caps.availableScopes}
                   resetDefaultFilters={getResetDefaultFiltersProp()}
                   clearFilters={getClearFiltersProp()}
+                  isTLSTracking={caps.isTLSTracking}
                 />
               </>
             );

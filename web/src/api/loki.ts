@@ -79,11 +79,19 @@ export interface TopologyMetricPeer {
   subnetLabel?: string;
 }
 
+/** TLS breakdown from Loki matrix metric labels (topology TLS aggregate: TLSVersion + TLSGroup). */
+export type GenericMetricTls = {
+  versions?: string[];
+  /** Cipher / key-exchange group (PQC compliance). */
+  groups?: string[];
+};
+
 export type GenericMetric = {
   name: string;
   values: [number, number][];
   stats: MetricStats;
   aggregateBy: Field;
+  tls?: GenericMetricTls;
 };
 
 export type FunctionMetrics = {
@@ -198,6 +206,8 @@ export type TopologyMetrics = {
   values: [number, number][];
   stats: MetricStats;
   scope: FlowScope;
+  /** TLSVersion / TLSGroup from Loki topology matrix labels when present. */
+  tls?: GenericMetricTls;
 };
 
 export type NamedMetric = TopologyMetrics & {

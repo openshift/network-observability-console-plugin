@@ -341,8 +341,17 @@ func (c *Frontend) GetAggregateKeyLabels() map[string][]string {
 		"droppedCause": {"PktDropLatestDropCause"},
 		"dnsRCode":     {"DnsFlagsResponseCode"},
 	}
+	const tlsVersionAggSuffix = "__TLSVersion"
 	for i := range c.Scopes {
-		keyLabels[c.Scopes[i].ID] = c.Scopes[i].Labels
+		id := c.Scopes[i].ID
+		labs := c.Scopes[i].Labels
+		keyLabels[id] = labs
+		// Same src/dst dimensions as topology scope, plus TLSVersion and TLSGroup (per-link TLS breakdown).
+		// TLSTypes is omitted from aggregation (cardinality); TLSGroup is used for PQC-oriented hints.
+		withTLS := make([]string, len(labs), len(labs)+2)
+		copy(withTLS, labs)
+		withTLS = append(withTLS, "TLSVersion", "TLSGroup")
+		keyLabels[id+tlsVersionAggSuffix] = withTLS
 	}
 	return keyLabels
 }
