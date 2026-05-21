@@ -10,7 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     # switch comment in/out at branch cut / release
     pipelinesascode.tekton.dev/on-cel-expression: |
-      event == "push" && target_branch == "main-pf5" && (
+      event == "push" && target_branch == "release-1.12-pf5" && (
         ".tekton/***".pathChanged() ||
         ".dockerignore".pathChanged() ||
         "Dockerfile.downstream".pathChanged() ||
