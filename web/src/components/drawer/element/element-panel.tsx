@@ -19,6 +19,7 @@ import { TopologyMetrics } from '../../../api/loki';
 import { RuleDetails } from '../../../components/health/rule-details';
 import { Filter, FilterDefinition, Filters } from '../../../model/filters';
 import { MetricType } from '../../../model/flow-query';
+import { useNetflowContext } from '../../../model/netflow-context';
 import { GraphElementPeer, NodeData } from '../../../model/topology';
 import { defaultSize, maxSize, minSize } from '../../../utils/panel';
 import { TruncateLength } from '../../dropdowns/truncate-dropdown';
@@ -57,6 +58,7 @@ export const ElementPanel: React.FC<ElementPanelProps> = ({
   isDark
 }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
+  const { caps } = useNetflowContext();
   const [activeTab, setActiveTab] = React.useState<string>('details');
 
   const data = element.getData();
@@ -102,17 +104,19 @@ export const ElementPanel: React.FC<ElementPanelProps> = ({
     }
   }, [element, elementName, data, t]);
 
-  React.useEffect(() => {
-    if ((activeTab === 'metrics' && _.isEmpty(metrics)) || (activeTab === 'dropped' && _.isEmpty(droppedMetrics))) {
-      setActiveTab('details');
-    }
-  }, [metrics, droppedMetrics, activeTab]);
+  const showDroppedTab = caps.isPktDrop && !noMetrics && !_.isEmpty(droppedMetrics);
+  const elementHealth = data?.health;
+  const showHealthTab = elementHealth !== undefined && healthKind !== undefined && !_.isEmpty(elementHealth);
 
   React.useEffect(() => {
-    if (activeTab === 'health' && _.isEmpty(data?.health)) {
+    if (
+      (activeTab === 'metrics' && (noMetrics || _.isEmpty(metrics))) ||
+      (activeTab === 'dropped' && !showDroppedTab) ||
+      (activeTab === 'health' && !showHealthTab)
+    ) {
       setActiveTab('details');
     }
-  }, [activeTab, data?.health]);
+  }, [metrics, activeTab, noMetrics, showDroppedTab, showHealthTab]);
 
   return (
     <DrawerPanelContent
@@ -159,7 +163,7 @@ export const ElementPanel: React.FC<ElementPanelProps> = ({
               />
             </Tab>
           )}
-          {!noMetrics && !_.isEmpty(droppedMetrics) && (
+          {showDroppedTab && (
             <Tab className="drawer-tab" eventKey={'dropped'} title={<TabTitleText>{t('Drops')}</TabTitleText>}>
               <ElementPanelMetrics
                 aData={aData}
@@ -171,20 +175,20 @@ export const ElementPanel: React.FC<ElementPanelProps> = ({
               />
             </Tab>
           )}
-          {data?.health !== undefined && healthKind !== undefined && (
+          {showHealthTab && elementHealth && healthKind && (
             <Tab className="drawer-tab" eventKey={'health'} title={<TabTitleText>{t('Health')}</TabTitleText>}>
               <>
                 <HealthCard
-                  key={`card-${data.health.name}`}
-                  resourceHealth={data.health}
-                  name={data.health.name}
-                  k8sKind={data.health.k8sKind}
+                  key={`card-${elementHealth.name}`}
+                  resourceHealth={elementHealth}
+                  name={elementHealth.name}
+                  k8sKind={elementHealth.k8sKind}
                   isDark={isDark || false}
                   isSelected={true}
                   hideTitle={true}
                 />
                 <div className="health-details">
-                  <RuleDetails kind={healthKind} resourceHealth={data.health} />
+                  <RuleDetails kind={healthKind} resourceHealth={elementHealth} />
                 </div>
               </>
             </Tab>

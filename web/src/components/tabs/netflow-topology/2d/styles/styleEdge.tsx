@@ -15,6 +15,7 @@ const StyleEdge: React.FC<StyleEdgeProps> = ({ element, ...rest }) => {
     const newData = { ...data };
     if (detailsLevel !== ScaleDetailsLevel.high) {
       newData.tag = undefined;
+      newData.tagTlsSecure = undefined;
     }
     Object.keys(newData).forEach(key => {
       if (newData[key] === undefined) {

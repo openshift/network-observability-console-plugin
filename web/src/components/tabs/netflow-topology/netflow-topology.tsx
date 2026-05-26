@@ -5,9 +5,11 @@ import _ from 'lodash';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  defaultNetflowMetrics,
   FunctionMetrics,
   getFunctionMetricKey,
   getRateMetricKey,
+  NetflowMetrics,
   RateMetrics,
   Stats,
   TopologyMetrics
@@ -15,12 +17,21 @@ import {
 import { getK8SUDNIds } from '../../../api/routes';
 import { Config } from '../../../model/config';
 import { FilterDefinition, Filters } from '../../../model/filters';
-import { FlowScope, isTimeMetric, MetricFunction, MetricType, StatFunction } from '../../../model/flow-query';
+import {
+  aggregateByWithTlsVersion,
+  FlowScope,
+  isTimeMetric,
+  MetricFunction,
+  MetricType,
+  showTLSHints,
+  StatFunction
+} from '../../../model/flow-query';
 import { useNetflowContext } from '../../../model/netflow-context';
 import { ScopeConfigDef } from '../../../model/scope';
 import { GraphElementPeer, LayoutName, TopologyOptions } from '../../../model/topology';
 import { TimeRange } from '../../../utils/datetime';
 import { getStructuredHTTPError } from '../../../utils/errors';
+import { mergeTlsIntoTopologyMetrics } from '../../../utils/metrics';
 import { observeDOMRect } from '../../../utils/metrics-helper';
 import { Result } from '../../../utils/result';
 import { fetchNetworkHealth } from '../../health/health-fetcher';
@@ -65,12 +76,14 @@ export interface NetflowTopologyProps {
   scopes: ScopeConfigDef[];
   resetDefaultFilters?: (c?: Config) => void;
   clearFilters?: () => void;
+  isTLSTracking?: boolean;
 }
 
 // eslint-disable-next-line react/display-name
 export const NetflowTopology = React.forwardRef<NetflowTopologyHandle, NetflowTopologyProps>((props, ref) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
   const { caps, config, fetchCallbacks } = useNetflowContext();
+  const effectiveIsTLSTracking = props.isTLSTracking ?? caps.isTLSTracking;
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = React.useState<DOMRect>({ width: 0, height: 0 } as DOMRect);
@@ -112,7 +125,8 @@ export const NetflowTopology = React.forwardRef<NetflowTopologyHandle, NetflowTo
       const fq = caps.flowQuery;
       const features = config.features;
       const { getMetrics } = caps.fetchFunctions;
-      const { metricsRef, setFlows, setMetrics, setError } = fetchCallbacks;
+      const fetchTlsGeneric = effectiveIsTLSTracking && showTLSHints(metricType);
+      const { setFlows, setMetrics, setError } = fetchCallbacks;
 
       setFlows([]);
 
@@ -126,7 +140,15 @@ export const NetflowTopology = React.forwardRef<NetflowTopologyHandle, NetflowTo
           ? 'PktDropPackets'
           : undefined
         : undefined;
-      let currentMetrics = { ...metricsRef.current };
+      const tlsMetricsClear = !fetchTlsGeneric
+        ? {
+            tlsFlowRate: defaultNetflowMetrics.tlsFlowRate,
+            totalFlowRate: defaultNetflowMetrics.totalFlowRate,
+            tlsUsagePerCipher: defaultNetflowMetrics.tlsUsagePerCipher,
+            tlsUsagePerGroup: defaultNetflowMetrics.tlsUsagePerGroup,
+            tlsUsagePerVersion: defaultNetflowMetrics.tlsUsagePerVersion
+          }
+        : {};
 
       const promises: Promise<Stats>[] = [
         getMetrics(
@@ -135,43 +157,90 @@ export const NetflowTopology = React.forwardRef<NetflowTopologyHandle, NetflowTo
             function: isTimeMetric(metricType) ? (metricFunction as MetricFunction) : 'rate'
           },
           range
-        ).then(res => {
-          if (['Bytes', 'Packets'].includes(metricType)) {
-            const rateMetrics = {} as RateMetrics;
-            rateMetrics[getRateMetricKey(metricType)] = res.metrics;
-            currentMetrics = {
-              ...currentMetrics,
-              rate: Result.success(rateMetrics),
-              dnsLatency: Result.empty(),
-              rtt: Result.empty()
-            };
-            setMetrics(currentMetrics);
-          } else if (['PktDropBytes', 'PktDropPackets'].includes(metricType)) {
-            const droppedRateMetrics = {} as RateMetrics;
-            droppedRateMetrics[getRateMetricKey(metricType)] = res.metrics;
-            currentMetrics = { ...currentMetrics, droppedRate: Result.success(droppedRateMetrics) };
-            setMetrics(currentMetrics);
-          } else if (['DnsLatencyMs'].includes(metricType)) {
-            const dnsLatencyMetrics = {} as FunctionMetrics;
-            dnsLatencyMetrics[getFunctionMetricKey(metricFunction)] = res.metrics;
-            currentMetrics = {
-              ...currentMetrics,
-              rate: Result.empty(),
-              dnsLatency: Result.success(dnsLatencyMetrics),
-              rtt: Result.empty()
-            };
-            setMetrics(currentMetrics);
-          } else if (['TimeFlowRttNs'].includes(metricType)) {
-            const rttMetrics = {} as FunctionMetrics;
-            rttMetrics[getFunctionMetricKey(metricFunction)] = res.metrics;
-            currentMetrics = {
-              ...currentMetrics,
-              rate: Result.empty(),
-              dnsLatency: Result.empty(),
-              rtt: Result.success(rttMetrics)
-            };
-            setMetrics(currentMetrics);
+        ).then(async res => {
+          let metrics = res.metrics;
+
+          // Publish volume / drop metrics immediately so edge stats are not blocked on the TLS follow-up query.
+          const commitMainMetrics = (m: TopologyMetrics[]) => {
+            if (['Bytes', 'Packets'].includes(metricType)) {
+              const rateMetrics = {} as RateMetrics;
+              rateMetrics[getRateMetricKey(metricType)] = m;
+              setMetrics(prev => ({
+                ...prev,
+                ...tlsMetricsClear,
+                rate: Result.success(rateMetrics),
+                dnsLatency: Result.empty(),
+                rtt: Result.empty()
+              }));
+            } else if (['PktDropBytes', 'PktDropPackets'].includes(metricType)) {
+              const droppedRateMetrics = {} as RateMetrics;
+              droppedRateMetrics[getRateMetricKey(metricType)] = m;
+              setMetrics(prev => ({
+                ...prev,
+                ...tlsMetricsClear,
+                droppedRate: Result.success(droppedRateMetrics)
+              }));
+            } else if (['DnsLatencyMs'].includes(metricType)) {
+              const dnsLatencyMetrics = {} as FunctionMetrics;
+              dnsLatencyMetrics[getFunctionMetricKey(metricFunction)] = m;
+              setMetrics(prev => ({
+                ...prev,
+                ...tlsMetricsClear,
+                rate: Result.empty(),
+                dnsLatency: Result.success(dnsLatencyMetrics),
+                rtt: Result.empty()
+              }));
+            } else if (['TimeFlowRttNs'].includes(metricType)) {
+              const rttMetrics = {} as FunctionMetrics;
+              rttMetrics[getFunctionMetricKey(metricFunction)] = m;
+              setMetrics(prev => ({
+                ...prev,
+                ...tlsMetricsClear,
+                rate: Result.empty(),
+                dnsLatency: Result.empty(),
+                rtt: Result.success(rttMetrics)
+              }));
+            }
+          };
+
+          commitMainMetrics(metrics);
+
+          // Per-edge TLS merge for topology volume edges (Bytes/Packets → rate; PktDrop* as primary → droppedRate).
+          if (fetchTlsGeneric && fq.aggregateBy) {
+            try {
+              const tlsRes = await getMetrics(
+                {
+                  ...fq,
+                  function: 'rate',
+                  type: 'TlsFlows',
+                  aggregateBy: aggregateByWithTlsVersion(fq.aggregateBy)
+                },
+                range
+              );
+              metrics = mergeTlsIntoTopologyMetrics(metrics, tlsRes.metrics);
+              setMetrics((prev: NetflowMetrics) => {
+                if (['Bytes', 'Packets'].includes(metricType)) {
+                  const rateMetrics = {} as RateMetrics;
+                  rateMetrics[getRateMetricKey(metricType)] = metrics;
+                  return {
+                    ...prev,
+                    rate: Result.success(rateMetrics),
+                    dnsLatency: Result.empty(),
+                    rtt: Result.empty()
+                  };
+                }
+                if (['PktDropBytes', 'PktDropPackets'].includes(metricType)) {
+                  const droppedRateMetrics = {} as RateMetrics;
+                  droppedRateMetrics[getRateMetricKey(metricType)] = metrics;
+                  return { ...prev, droppedRate: Result.success(droppedRateMetrics) };
+                }
+                return prev;
+              });
+            } catch (err) {
+              console.warn('Could not fetch per-edge TLS metrics:', err);
+            }
           }
+
           return res.stats;
         })
       ];
@@ -180,10 +249,11 @@ export const NetflowTopology = React.forwardRef<NetflowTopologyHandle, NetflowTo
         promises.push(
           getMetrics({ ...fq, type: droppedType }, range)
             .then(res => {
-              const droppedRateMetrics = {} as RateMetrics;
-              droppedRateMetrics[getRateMetricKey(metricType)] = res.metrics;
-              currentMetrics = { ...currentMetrics, droppedRate: Result.success(droppedRateMetrics) };
-              setMetrics(currentMetrics);
+              setMetrics((prev: NetflowMetrics) => {
+                const droppedRateMetrics = {} as RateMetrics;
+                droppedRateMetrics[getRateMetricKey(metricType)] = res.metrics;
+                return { ...prev, droppedRate: Result.success(droppedRateMetrics) };
+              });
               return res.stats;
             })
             .catch(err => {
@@ -195,12 +265,18 @@ export const NetflowTopology = React.forwardRef<NetflowTopologyHandle, NetflowTo
             })
         );
       } else if (!['PktDropBytes', 'PktDropPackets'].includes(metricType)) {
-        currentMetrics = { ...currentMetrics, droppedRate: Result.empty() };
-        setMetrics(currentMetrics);
+        setMetrics((prev: NetflowMetrics) => ({ ...prev, droppedRate: Result.empty() }));
       }
       return Promise.all(promises);
     },
-    [refreshResourceStatsIfNeeded, caps.flowQuery, caps.fetchFunctions, config.features, fetchCallbacks]
+    [
+      refreshResourceStatsIfNeeded,
+      caps.flowQuery,
+      caps.fetchFunctions,
+      effectiveIsTLSTracking,
+      config.features,
+      fetchCallbacks
+    ]
   );
 
   // Initial fetch and setup update trigger
