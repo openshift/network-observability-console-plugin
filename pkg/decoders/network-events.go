@@ -3,7 +3,7 @@ package decoders
 import (
 	"encoding/json"
 
-	ovnutils "github.com/netobserv/netobserv-ebpf-agent/pkg/utils"
+	"github.com/netobserv/netobserv-ebpf-agent/pkg/utils/networkevents"
 	"github.com/netobserv/network-observability-console-plugin/pkg/model/fields"
 	"github.com/sirupsen/logrus"
 )
@@ -16,7 +16,7 @@ func NetworkEventsToString(in string) string {
 		dlog.Errorf("Could not decode NetworkEvent: %v", err)
 		return in
 	}
-	events := ovnutils.NetworkEventsToStrings(line)
+	events := networkevents.MapToStrings(line)
 	if events != nil {
 		line[fields.NetworkEvents] = events
 		b, err := json.Marshal(line)
