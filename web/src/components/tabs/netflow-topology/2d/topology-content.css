@@ -33,6 +33,40 @@ g.netobserv.topology.pf-topology__edge.dark>.pf-topology__edge__tag>.pf-topology
   fill: #E0E0E0;
 }
 
+/* TLS lock on edge tag: default / unknown */
+g.netobserv.topology.pf-topology__edge:not(.dark) .netobserv-topology-edge-lock--unknown path {
+  fill: var(--pf-t--global--text--color--inverse);
+}
+
+g.netobserv.topology.pf-topology__edge.dark .netobserv-topology-edge-lock--unknown path {
+  fill: var(--pf-t--global--text--color--regular);
+}
+
+g.netobserv.topology.pf-topology__edge:not(.dark) .netobserv-topology-edge-lock--modern path,
+g.netobserv.topology.pf-topology__edge.dark .netobserv-topology-edge-lock--modern path {
+  fill: var(--pf-t--global--success-color--100, #3e8635);
+}
+
+g.netobserv.topology.pf-topology__edge:not(.dark) .netobserv-topology-edge-lock--pqc path,
+g.netobserv.topology.pf-topology__edge.dark .netobserv-topology-edge-lock--pqc path {
+  fill: var(--pf-t--global--color--blue-50, #2b9af3);
+}
+
+g.netobserv.topology.pf-topology__edge:not(.dark) .netobserv-topology-edge-lock--legacy path,
+g.netobserv.topology.pf-topology__edge.dark .netobserv-topology-edge-lock--legacy path {
+  fill: var(--pf-t--global--warning-color--100, #f0ab00);
+}
+
+g.netobserv.topology.pf-topology__edge:not(.dark) .netobserv-topology-edge-lock--deprecated path,
+g.netobserv.topology.pf-topology__edge.dark .netobserv-topology-edge-lock--deprecated path {
+  fill: var(--pf-t--global--danger-color--100, #c9190b);
+}
+
+g.netobserv.topology.pf-topology__edge:not(.dark) .netobserv-topology-edge-lock--cleartext path,
+g.netobserv.topology.pf-topology__edge.dark .netobserv-topology-edge-lock--cleartext path {
+  fill: var(--pf-t--global--icon--color--subtle);
+}
+
 g.netobserv.topology.pf-topology__edge>.pf-topology__edge__link,
 g.netobserv.topology.pf-topology__edge>.pf-topology-connector-arrow {
   stroke: #6A6E73;

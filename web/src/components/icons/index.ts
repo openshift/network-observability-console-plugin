@@ -11,3 +11,4 @@
 export * from './kubernetes-icons';
 export * from './react-icons';
 export * from './react-icons-wrapper';
+export * from './tls-lock-icons';

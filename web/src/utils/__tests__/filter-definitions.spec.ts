@@ -1,7 +1,32 @@
 import { ColumnConfigSampleDefs } from '../../components/__tests-data__/columns';
 import { FilterConfigSampleDefs, FilterDefinitionSample } from '../../components/__tests-data__/filters';
 import { Config, Feature } from '../../model/config';
-import { checkFilterAvailable, findFilter } from '../filter-definitions';
+import { FilterCompare } from '../../model/filters';
+import { checkFilterAvailable, findFilter, getFilterDefinitions } from '../filter-definitions';
+
+describe('Endpoint namespace encoder', () => {
+  it('should encode namespace filter as Src|Dst OR, not undefined field', () => {
+    const def = findFilter(FilterDefinitionSample, 'namespace')!;
+    const encoded = def.encoder([{ v: 'tls-tests' }], FilterCompare.equal, false);
+    expect(encoded).toBe('SrcK8S_Namespace=tls-tests|DstK8S_Namespace=tls-tests');
+  });
+
+  it('should build namespace filter from getFilterDefinitions when column has no filter key', () => {
+    const columnsWithoutFilterLink = ColumnConfigSampleDefs.map(c =>
+      c.id === 'K8S_Namespace' ? { ...c, filter: undefined } : c
+    );
+    const defs = getFilterDefinitions(FilterConfigSampleDefs, columnsWithoutFilterLink, jest.fn() as never);
+    const def = findFilter(defs, 'namespace')!;
+    expect(def.encoder([{ v: 'ns1' }], FilterCompare.equal, false)).toBe('SrcK8S_Namespace=ns1|DstK8S_Namespace=ns1');
+  });
+
+  it('should encode negated namespace filter with AND across src and dst', () => {
+    const def = findFilter(FilterDefinitionSample, 'namespace')!;
+    expect(def.encoder([{ v: 'ns1' }], FilterCompare.notEqual, false)).toBe(
+      'SrcK8S_Namespace!=ns1&DstK8S_Namespace!=ns1'
+    );
+  });
+});
 
 describe('Resource validation', () => {
   const def = findFilter(FilterDefinitionSample, 'src_resource')!;

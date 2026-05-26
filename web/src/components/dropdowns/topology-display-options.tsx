@@ -27,6 +27,7 @@ export interface TopologyDisplayOptionsProps {
   setTopologyOptions: (o: TopologyOptions) => void;
   allowedTypes: MetricType[];
   scopes: ScopeConfigDef[];
+  isTLSTracking: boolean;
 }
 
 export const TopologyDisplayOptions: React.FC<TopologyDisplayOptionsProps> = ({
@@ -39,7 +40,8 @@ export const TopologyDisplayOptions: React.FC<TopologyDisplayOptionsProps> = ({
   topologyOptions,
   setTopologyOptions,
   allowedTypes,
-  scopes
+  scopes,
+  isTLSTracking
 }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
 
@@ -178,6 +180,27 @@ export const TopologyDisplayOptions: React.FC<TopologyDisplayOptionsProps> = ({
               })
             }
           />
+          {isTLSTracking && (
+            <Tooltip
+              content={t(
+                'Marks volume edges as cleartext when aggregated logs show no TLS signals, using an open-lock icon. Can add many icons; use for focused troubleshooting.'
+              )}
+            >
+              <Checkbox
+                id="edges-cleartext-lock-switch"
+                data-test="edges-cleartext-lock-switch"
+                label={t('Cleartext traffic')}
+                isDisabled={!topologyOptions.edges}
+                isChecked={Boolean(topologyOptions.edges && topologyOptions.showCleartextEdgeLock)}
+                onChange={() =>
+                  setTopologyOptions({
+                    ...topologyOptions,
+                    showCleartextEdgeLock: !topologyOptions.showCleartextEdgeLock
+                  })
+                }
+              />
+            </Tooltip>
+          )}
           <Checkbox
             id="badge-switch"
             label={t('Badges')}

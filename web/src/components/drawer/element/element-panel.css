@@ -25,6 +25,7 @@
 #pf-tab-section-details-drawer-tabs,
 #pf-tab-section-metrics-drawer-tabs,
 #pf-tab-section-dropped-drawer-tabs,
+#pf-tab-section-tls-drawer-tabs,
 #pf-tab-section-health-drawer-tabs {
   overflow-x: hidden !important;
   overflow-y: auto !important;
