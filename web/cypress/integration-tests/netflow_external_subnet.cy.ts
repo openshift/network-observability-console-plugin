@@ -21,11 +21,10 @@ describe('(OCP-67615, OCP-72874 Network_Observability) Return external traffic a
         cy.byTestID("table-composable").should('exist')
 
         // enable SrcSubnetLabel and DstSubnetLabel columns
-        cy.openColumnsModal()
-        cy.get(colSelectors.columnsModal).should('be.visible')
-        cy.get('#SrcSubnetLabel').check()
-        cy.get('#DstSubnetLabel').check()
-        cy.byTestID(colSelectors.save).click()
+        cy.selectAndVerifyColumns([
+            colSelectors.srcSubnetLabel,
+            colSelectors.dstSubnetLabel
+        ])
 
         // filter on SrcSubnetLabel Pods and DstIP 52.200.142.250
         cy.byTestID("column-filter-toggle").click().get('.pf-c-dropdown__menu').should('be.visible')
@@ -64,6 +63,8 @@ describe('(OCP-67615, OCP-72874 Network_Observability) Return external traffic a
         cy.byTestID("column-filter-toggle").click().get('.pf-c-dropdown__menu').should('be.visible')
         cy.byTestID('group-0-toggle').click().should('be.visible')
         cy.byTestID('src_namespace').click()
+
+        netflowPage.clearAllFilters()
     })
 
     afterEach("each test", function () {

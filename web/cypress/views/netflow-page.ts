@@ -8,6 +8,7 @@ declare global {
             checkPanel(panelName: string[]): Chainable<Element>
             openPanelsModal(): Chainable<Element>
             openColumnsModal(): Chainable<Element>
+            selectAndVerifyColumns(columnSelectors: string[]): Chainable<Element>
             selectPopupItems(id: string, names: string[]): Chainable<Element>
             checkPopupItems(id: string, names: string[]): Chainable<Element>
             checkQuerySummary(metric: JQuery<HTMLElement>): Chainable<Element>
@@ -54,11 +55,6 @@ export const netflowPage = {
         cy.switchPerspective('Developer');
         guidedTour.close()
         cy.visit(`/dev-monitoring/ns/${project}/netflow-traffic`)
-    },
-    toggleFullScreen: () => {
-        cy.byTestID(genSelectors.moreOpts).should('exist').click().then(() => {
-            cy.get(genSelectors.expand).click()
-        })
     },
     setAutoRefresh: () => {
         cy.byTestID(genSelectors.refreshDrop).then(btn => {
@@ -180,37 +176,37 @@ export namespace genSelectors {
     export const fullScreen = '[data-test=fullscreen-button]'
 }
 
-// Helper function to generate table header column selectors
-const thCol = (columnId: string): string => `[data-test=th-${columnId}] button`;
-
 export namespace colSelectors {
     export const columnsModal = '.modal-content'
     export const save = 'columns-save-button'
     export const resetDefault = 'columns-reset-button'
-    export const mac = thCol('Mac')
-    export const k8sOwner = thCol('K8S_OwnerObject')
-    export const ipPort = thCol('AddrPort')
-    export const protocol = thCol('Proto')
-    export const icmpType = thCol('IcmpType')
-    export const icmpCode = thCol('IcmpCode')
-    export const srcNodeIP = thCol('SrcK8S_HostIP')
-    export const srcNS = thCol('SrcK8S_Namespace')
-    export const dstNodeIP = thCol('DstK8S_HostIP')
-    export const direction = thCol('FlowDirection')
-    export const bytes = thCol('Bytes')
-    export const packets = thCol('Packets')
-    export const recordType = thCol('RecordType')
-    export const conversationID = thCol('_HashId')
-    export const flowRTT = thCol('TimeFlowRttMs')
-    export const dscp = thCol('Dscp')
-    export const dnsLatency = thCol('DNSLatency')
-    export const dnsResponseCode = thCol('DNSResponseCode')
-    export const dnsId = thCol('DNSId')
-    export const dnsError = thCol('DNSErrNo')
-    export const dnsName = thCol('DNSName')
-    export const srcZone = thCol('SrcZone')
-    export const dstZone = thCol('DstZone')
-    export const clusterName = thCol('ClusterName')
+    export const mac = '#Mac'
+    export const k8sOwner = '#K8S_OwnerObject'
+    export const ipPort = '#AddrPort'
+    export const protocol = '#Proto'
+    export const icmpType = '#IcmpType'
+    export const icmpCode = '#IcmpCode'
+    export const srcNodeIP = '#SrcK8S_HostIP'
+    export const srcNS = '#SrcK8S_Namespace'
+    export const dstNodeIP = '#DstK8S_HostIP'
+    export const direction = '#FlowDirection'
+    export const bytes = '#Bytes'
+    export const packets = '#Packets'
+    export const recordType = '#RecordType'
+    export const conversationID = '#_HashId'
+    export const startTime = '#StartTime'
+    export const flowRTT = '#TimeFlowRttMs'
+    export const dscp = '#Dscp'
+    export const dnsLatency = '#DNSLatency'
+    export const dnsResponseCode = '#DNSResponseCode'
+    export const dnsId = '#DNSId'
+    export const dnsError = '#DNSErrNo'
+    export const dnsName = '#DNSName'
+    export const srcZone = '#SrcZone'
+    export const dstZone = '#DstZone'
+    export const clusterName = '#ClusterName'
+    export const srcSubnetLabel = '#SrcSubnetLabel'
+    export const dstSubnetLabel = '#DstSubnetLabel'
 }
 
 export namespace exportSelectors {
@@ -364,6 +360,28 @@ Cypress.Commands.add('selectPopupItems', (id, names) => {
     }
 });
 
+Cypress.Commands.add('selectAndVerifyColumns', (columnSelectors: string[]) => {
+    // Open the columns modal
+    cy.openColumnsModal().then(() => {
+        cy.get(colSelectors.columnsModal).should('be.visible');
+
+        // Check each column
+        columnSelectors.forEach(selector => {
+            cy.get(selector).check();
+        });
+
+        cy.byTestID(colSelectors.save).click();
+    });
+    cy.reload();
+
+    // Verify columns appear in table
+    cy.byTestID('table-composable').should('exist').within(() => {
+        columnSelectors.forEach(selector => {
+            cy.get(selector).should('exist');
+        });
+    });
+});
+
 Cypress.Commands.add('checkQuerySummary', (metric) => {
     // parseFloat handles formats: "123 ms", "123+ ms", "1.5k ms", "1.5k+ ms"
     const num = parseFloat(metric.text())
@@ -389,7 +407,7 @@ Cypress.Commands.add('visitNetflowTrafficTab', (page) => {
 
 Cypress.Commands.add('checkNetflowTraffic', (loki = "Enabled") => {
     // overview panels
-    cy.get('li.overviewTabButton').should('exist').click({ force: true })
+    cy.get('#tabs-container').contains('Overview').click({ force: true })
     netflowPage.setAutoRefresh()
     cy.wait(2000)
     cy.checkPanel(overviewSelectors.defaultPanels)
@@ -400,13 +418,13 @@ Cypress.Commands.add('checkNetflowTraffic', (loki = "Enabled") => {
         cy.get('li.tableTabButton > button').should('exist').should('have.class', 'pf-m-aria-disabled')
     }
     else {
-        cy.get('li.tableTabButton').should('exist').click()
+        cy.get('#tabs-container').contains('Traffic flows').click()
         cy.wait(1000)
         cy.byTestID("table-composable", { timeout: 60000 }).should('exist')
     }
 
     // topology view
-    cy.get('li.topologyTabButton').should('exist').click()
+    cy.get('#tabs-container').contains('Topology').click()
     cy.wait(2000)
     cy.get('#drawer', { timeout: 60000 }).should('not.be.empty')
 });
