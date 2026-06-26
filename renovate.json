@@ -26,6 +26,10 @@
     ]
   },
   "dockerfile": {
+    "ignorePaths": [
+      "Dockerfile.cypress",
+      "Dockerfile.e2e"
+    ],
     "packageRules": [
       {
         "matchManagers": ["dockerfile"],
