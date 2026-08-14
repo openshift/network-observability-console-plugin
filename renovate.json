@@ -28,15 +28,19 @@
   "dockerfile": {
     "ignorePaths": [
       "Dockerfile.cypress",
-      "Dockerfile.e2e"
+      "Dockerfile.e2e",
+      "vendor/**"
     ],
     "packageRules": [
+      {
+        "matchManagers": ["dockerfile"],
+        "groupName": "Base images"
+      },
       {
         "matchManagers": ["dockerfile"],
         "matchPackageNames": ["docker.io/library/golang"],
         "enabled": false
       }
-    ],
-    "ignorePaths": ["vendor/**"]
+    ]
   }
 }
