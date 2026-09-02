@@ -36,7 +36,9 @@ const shortKindMap: { [k: string]: string } = {
   Service: 'svc',
   Deployment: 'depl',
   DaemonSet: 'ds',
-  StatefulSet: 'sts'
+  StatefulSet: 'sts',
+  VirtualMachine: 'vm',
+  VirtualMachineInstance: 'vmi'
 };
 
 export const percentileValues = [90, 99];

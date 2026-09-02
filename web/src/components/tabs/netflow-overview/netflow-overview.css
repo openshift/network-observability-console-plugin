@@ -27,6 +27,7 @@
 .overview-flex-item.full {
   flex: auto;
   width: 100%;
+  min-width: 100%;
 }
 
 .emptygraph {
@@ -37,4 +38,46 @@
 
 #top_avg_donut {
   position: relative;
+}
+
+.overview-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  container-type: inline-size;
+  container-name: netobserv-overview;
+}
+
+/* Room for the sticky scope slider (matches former JS: min(7.5% of container, 5.5rem)) */
+#overview-graph-list {
+  margin-left: min(7.5cqw, 5.5rem);
+}
+
+/* Stack overview cards when embedded in a narrow resource tab / split pane */
+@container netobserv-overview (max-width: 48rem) {
+  .overview-flex-item {
+    min-width: 100%;
+    width: 100%;
+  }
+
+  #overview-flex {
+    flex-direction: column;
+  }
+
+  /* Focus mode sets inline width/marginLeft; override so the list can stack full-width */
+  #overview-sticky-graph ~ #overview-graph-list {
+    width: auto !important;
+    margin-left: 0 !important;
+  }
+}
+
+@container netobserv-overview (max-width: 36rem) {
+  #overview-scope-slider-div {
+    display: none;
+  }
+
+  #overview-graph-list {
+    margin-left: 0 !important;
+  }
 }

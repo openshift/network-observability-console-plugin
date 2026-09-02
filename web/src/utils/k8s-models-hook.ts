@@ -99,6 +99,10 @@ export function useK8sModelsWithColors() {
 
     //$color-gateway-dark = $pf-v5-color-blue-500 = #004080 (same as deployments)
     setModel('Gateway', 'G', '#004080');
+
+    //$color-pod-overlord = $pf-v5-color-blue-500 = #004080 (same as deployments)
+    setModel('VirtualMachine', 'VM', '#004080');
+    setModel('VirtualMachineInstance', 'VMI', '#004080');
   }
 
   return k8sModels;

@@ -57,8 +57,33 @@
   padding-left: 1.5em;
 }
 
-.flex-block.no-wrap {
-  flex-wrap: nowrap;
+/* Filter groups (Source / Destination / …): wrap when the pane is narrow */
+#filter-toolbar-chips .pf-v5-c-toolbar__content-section,
+#filter-toolbar-chips .pf-v6-c-toolbar__content-section {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+#filters,
+#forced-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0;
+  row-gap: var(--pf-t--global--spacer--sm, 0.5rem);
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+.filters-group {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filters-group .custom-chip-box {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .toolbar-item-center {

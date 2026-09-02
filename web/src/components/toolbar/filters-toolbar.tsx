@@ -1,16 +1,9 @@
-import {
-  ExpandableSectionToggle,
-  Toolbar,
-  ToolbarContent,
-  ToolbarItem,
-  Tooltip,
-  ValidatedOptions
-} from '@patternfly/react-core';
-import { CompressIcon, ExpandIcon } from '@patternfly/react-icons';
+import { Button, Toolbar, ToolbarContent, ToolbarItem, Tooltip, ValidatedOptions } from '@patternfly/react-core';
+import { AngleDownIcon, AngleRightIcon, CompressIcon, ExpandIcon } from '@patternfly/react-icons';
 import * as _ from 'lodash';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Filter, FilterCompare, FilterDefinition, Filters, summarizeFilters } from '../../model/filters';
+import { Filter, FilterCompare, FilterDefinition, Filters } from '../../model/filters';
 import { useNetflowContext } from '../../model/netflow-context';
 import { autoCompleteCache } from '../../utils/autocomplete-cache';
 import { findFilter, matcher } from '../../utils/filter-definitions';
@@ -34,6 +27,8 @@ export interface FiltersToolbarProps {
   queryOptionsProps: QueryOptionsProps;
   isFullScreen: boolean;
   setFullScreen: (b: boolean) => void;
+  /** Optional content rendered on the same controls row, pinned to the end (e.g. time range). */
+  trailingContent?: React.ReactNode;
 }
 
 export type Direction = 'source' | 'destination' | undefined;
@@ -48,6 +43,7 @@ export const FiltersToolbar: React.FC<FiltersToolbarProps> = ({
   resetFilters,
   isFullScreen,
   setFullScreen,
+  trailingContent,
   ...props
 }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
@@ -132,7 +128,7 @@ export const FiltersToolbar: React.FC<FiltersToolbarProps> = ({
 
   const getFilterToolbar = React.useCallback(() => {
     return (
-      <ToolbarItem className="flex-start">
+      <ToolbarItem className="flex-start filter-search-toolbar-item">
         <Tooltip
           //css hide tooltip here to avoid render issue
           className={`filters-tooltip${_.isEmpty(message) ? '-empty' : ''}`}
@@ -191,64 +187,68 @@ export const FiltersToolbar: React.FC<FiltersToolbarProps> = ({
   } else if (defaultFilters.length > 0) {
     showHideText = showFilters ? t('Hide filters') : t('Show filters');
   }
-  const showHideItem = (
-    <ToolbarItem className="flex-start">
-      <ExpandableSectionToggle
-        data-test="show-filters-button"
-        id="show-filters-button"
-        className="overflow-button"
-        isExpanded={showFilters}
-        onToggle={isExpanded => setShowFilters(isExpanded)}
-      >
-        {showHideText}
-      </ExpandableSectionToggle>
-    </ToolbarItem>
-  );
-  const showHideTooltip = showFilters ? (
-    showHideItem
-  ) : (
-    <Tooltip content={summarizeFilters(filtersOrForced)}>{showHideItem}</Tooltip>
-  );
   return (
     <>
       <Toolbar data-test={id} id={id}>
-        <ToolbarContent data-test={`${id}-search-filters`} id={`${id}-search-filters`} toolbarId={id}>
-          <ToolbarItem className="flex-start">
-            <QueryOptionsDropdown {...props.queryOptionsProps} />
-          </ToolbarItem>
-          {!isForced && quickFilters.length > 0 && (
-            <ToolbarItem className="flex-start">
-              <QuickFilters
-                quickFilters={quickFilters}
-                activeFilters={filters?.list || []}
-                setFilters={list => setFilters({ ...filters!, list })}
+        <ToolbarContent
+          data-test={`${id}-search-filters`}
+          id={`${id}-search-filters`}
+          toolbarId={id}
+          className={trailingContent ? 'netobserv-controls-with-trailing' : undefined}
+        >
+          <div className="netobserv-toolbar-leading">
+            <ToolbarItem>
+              <QueryOptionsDropdown {...props.queryOptionsProps} />
+            </ToolbarItem>
+            {!isForced && quickFilters.length > 0 && (
+              <ToolbarItem className="flex-start">
+                <QuickFilters
+                  quickFilters={quickFilters}
+                  activeFilters={filters?.list || []}
+                  setFilters={list => setFilters({ ...filters!, list })}
+                />
+              </ToolbarItem>
+            )}
+            {!isForced && getFilterToolbar()}
+            {showHideText && countActiveFilters > 0 && (
+              <ToolbarItem>
+                <Button
+                  data-test="show-filters-button"
+                  id="show-filters-button"
+                  variant="link"
+                  className="overflow-button"
+                  icon={showFilters ? <AngleDownIcon /> : <AngleRightIcon />}
+                  aria-expanded={showFilters}
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  {showHideText}
+                </Button>
+              </ToolbarItem>
+            )}
+            <ToolbarItem>
+              <LinksOverflow
+                id={'filters-more-options'}
+                items={[
+                  {
+                    id: 'fullscreen',
+                    label: isFullScreen ? t('Collapse') : t('Expand'),
+                    onClick: () => setFullScreen(!isFullScreen),
+                    icon: isFullScreen ? <CompressIcon /> : <ExpandIcon />
+                  },
+                  {
+                    id: 'set-default-filters',
+                    label: t('Default filters'),
+                    onClick: () => {
+                      resetFilters();
+                      autoCompleteCache.clear();
+                    },
+                    enabled: countActiveFilters === 0
+                  }
+                ]}
               />
             </ToolbarItem>
-          )}
-          {!isForced && getFilterToolbar()}
-          {showHideText && countActiveFilters > 0 && <>{showHideTooltip}</>}
-          <ToolbarItem className="flex-start">
-            <LinksOverflow
-              id={'filters-more-options'}
-              items={[
-                {
-                  id: 'fullscreen',
-                  label: isFullScreen ? t('Collapse') : t('Expand'),
-                  onClick: () => setFullScreen(!isFullScreen),
-                  icon: isFullScreen ? <CompressIcon /> : <ExpandIcon />
-                },
-                {
-                  id: 'set-default-filters',
-                  label: t('Default filters'),
-                  onClick: () => {
-                    resetFilters();
-                    autoCompleteCache.clear();
-                  },
-                  enabled: countActiveFilters === 0
-                }
-              ]}
-            />
-          </ToolbarItem>
+          </div>
+          {trailingContent && <div className="netobserv-toolbar-trailing">{trailingContent}</div>}
         </ToolbarContent>
       </Toolbar>
       {showFilters && countActiveFilters > 0 && (

@@ -438,6 +438,40 @@ module.exports = {
           }
         },
         {
+          type: "console.tab/horizontalNav",
+          properties: {
+            model: {
+              version: "v1",
+              group: "kubevirt.io",
+              kind: "VirtualMachine"
+            },
+            component: {
+              "$codeRef": "netflowTab.default"
+            },
+            "page": {
+              name: "%plugin__netobserv-plugin~Network Traffic%",
+              "href": "netflow"
+            }
+          }
+        },
+        {
+          type: "console.tab/horizontalNav",
+          properties: {
+            model: {
+              version: "v1",
+              group: "kubevirt.io",
+              kind: "VirtualMachineInstance"
+            },
+            component: {
+              "$codeRef": "netflowTab.default"
+            },
+            "page": {
+              name: "%plugin__netobserv-plugin~Network Traffic%",
+              "href": "netflow"
+            }
+          }
+        },
+        {
           type: "console.tab",
           properties: {
             "contextId": "dev-console-observe",

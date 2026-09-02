@@ -5,8 +5,10 @@ import {
   defaultControlButtonsOptions,
   GRAPH_LAYOUT_END_EVENT as graphLayoutEndEvent,
   GRAPH_POSITION_CHANGE_EVENT as graphPositionChangeEvent,
+  isEdge,
+  isNode,
   Model,
-  Node,
+  NODE_COLLAPSE_CHANGE_EVENT as nodeCollapseChangeEvent,
   SELECTION_EVENT as selectionEvent,
   SelectionEventListener,
   TopologyControlBar,
@@ -16,6 +18,7 @@ import {
   VisualizationSurface
 } from '@patternfly/react-topology';
 import _ from 'lodash';
+import { runInAction } from 'mobx';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { TopologyMetrics } from '../../../../api/query-response';
@@ -27,6 +30,7 @@ import { getStat } from '../../../../model/metrics';
 import { useNetflowContext } from '../../../../model/netflow-context';
 import { getStepInto, resolveGroupTypes, ScopeConfigDef } from '../../../../model/scope';
 import {
+  AGGREGATE_EDGE_TYPE,
   Decorated,
   ElementData,
   FilterDir,
@@ -34,6 +38,7 @@ import {
   GraphElementPeer,
   isDirElementFiltered,
   LayoutName,
+  maybeAggregateEdges,
   NodeData,
   toggleDirElementFilter,
   TopologyOptions
@@ -41,6 +46,7 @@ import {
 import { usePrevious } from '../../../../utils/previous-hook';
 import { Empty } from '../../../messages/empty';
 import { SearchEvent, SearchHandle } from '../../../search/search';
+import { AggregateEdgeSnapContext } from './aggregate-edge-snap-context';
 import { filterEvent, stepIntoEvent } from './styles/styleDecorators';
 import './topology-content.css';
 
@@ -121,6 +127,12 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
 
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [hoveredId, setHoveredId] = React.useState<string>('');
+  const [snapGeneration, setSnapGeneration] = React.useState(0);
+  // Refs so hover/select highlight can update in place without rebuilding the aggregated model.
+  const hoveredIdRef = React.useRef(hoveredId);
+  hoveredIdRef.current = hoveredId;
+  const selectedIdsRef = React.useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
 
   const onSelectIds = React.useCallback(
     (ids: string[]) => {
@@ -260,7 +272,29 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
     }
   }, [controller]);
 
+  const clearAggregateEdgeEndpoints = React.useCallback(() => {
+    if (!controller?.hasGraph()) {
+      return;
+    }
+    runInAction(() => {
+      controller.getElements().forEach(e => {
+        if (e.getType() === AGGREGATE_EDGE_TYPE && isEdge(e)) {
+          e.setStartPoint();
+          e.setEndPoint();
+        }
+      });
+    });
+  }, [controller]);
+
+  const bumpSnapGeneration = React.useCallback(() => {
+    setSnapGeneration(g => g + 1);
+  }, []);
+
   const onLayoutEnd = React.useCallback(() => {
+    // Drop stale fixed endpoints from mid-layout snaps, then force-resnap.
+    clearAggregateEdgeEndpoints();
+    bumpSnapGeneration();
+
     //fit view to new loaded elements
     if (requestFit) {
       requestFit = false;
@@ -280,7 +314,7 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
         requestAnimationFrame(fitOnFrame);
       }
     }
-  }, [fitView, options.layout]);
+  }, [bumpSnapGeneration, clearAggregateEdgeEndpoints, fitView, options.layout]);
 
   const onLayoutPositionChange = React.useCallback(() => {
     if (controller && controller.hasGraph()) {
@@ -357,16 +391,17 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
     }
     waitForMetrics = false;
 
-    //highlight either hoveredId or selected id
-    let highlightedId = hoveredId;
-    if (!highlightedId && selectedIds.length === 1) {
-      highlightedId = selectedIds[0];
+    // Highlight from refs so hover/select can update independently (see effect below).
+    let highlightedId = hoveredIdRef.current;
+    if (!highlightedId && selectedIdsRef.current.length === 1) {
+      highlightedId = selectedIdsRef.current[0];
     }
 
+    const currentOptions = getOptions();
     const updatedModel = generateDataModel(
       metrics,
       droppedMetrics,
-      getOptions(),
+      currentOptions,
       metricScope,
       scopes,
       searchEvent?.searchValue || '',
@@ -379,6 +414,29 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
       isDark,
       resourceStats
     );
+
+    // Preserve interactive collapse before aggregating (collapsedGroups remapping).
+    controller.getElements().forEach(e => {
+      if (e.getType() === 'group' && isNode(e)) {
+        const updatedGroup = updatedModel.nodes?.find(n => n.id === e.getId());
+        if (updatedGroup) {
+          updatedGroup.collapsed = e.isCollapsed();
+        }
+      }
+    });
+
+    updatedModel.edges = maybeAggregateEdges(updatedModel.nodes, updatedModel.edges, currentOptions, highlightedId, t);
+
+    // Highlight all selected aggregate path segments (selection can be multi-id).
+    const selectedIdsForHighlight = selectedIdsRef.current;
+    if (selectedIdsForHighlight.length > 1) {
+      updatedModel.edges?.forEach(e => {
+        if (selectedIdsForHighlight.includes(e.id)) {
+          e.data = { ...e.data, highlighted: true };
+        }
+      });
+    }
+
     const allIds = [...(updatedModel.nodes || []), ...(updatedModel.edges || [])].map(item => item.id);
     controller.getElements().forEach(e => {
       if (e.getType() !== 'graph') {
@@ -392,10 +450,7 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
               }
               break;
             case 'group':
-              const updatedGroup = updatedModel.nodes?.find(n => n.id === e.getId());
-              if (updatedGroup) {
-                updatedGroup.collapsed = (e as Node).isCollapsed();
-              }
+              // collapsed already synced above before aggregation
               break;
           }
         } else {
@@ -409,8 +464,6 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
     prevMetrics,
     metrics,
     droppedMetrics,
-    hoveredId,
-    selectedIds,
     getOptions,
     metricScope,
     scopes,
@@ -424,6 +477,67 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
     resourceStats
   ]);
 
+  const onCollapseChange = React.useCallback(() => {
+    // Rebuild aggregates from live Node.collapsed. Clear + resnap only here (and
+    // on layout end) — not on routine metric/tag updateModel refreshes.
+    updateModel();
+    clearAggregateEdgeEndpoints();
+    bumpSnapGeneration();
+  }, [bumpSnapGeneration, clearAggregateEdgeEndpoints, updateModel]);
+
+  // Hover / selection highlight only — avoid regenerating + re-aggregating the whole model.
+  React.useEffect(() => {
+    if (!controller?.hasGraph()) {
+      return;
+    }
+    let highlightedId = hoveredId;
+    if (!highlightedId && selectedIds.length === 1) {
+      highlightedId = selectedIds[0];
+    }
+
+    runInAction(() => {
+      controller.getElements().forEach(el => {
+        if (el.getType() === 'graph') {
+          return;
+        }
+        const data = el.getData() || {};
+        if (data.shadowed) {
+          if (data.highlighted) {
+            el.setData({ ...data, highlighted: false });
+          }
+          return;
+        }
+
+        let highlighted = false;
+        if (highlightedId) {
+          if (el.getType() === 'node' || el.getType() === 'group') {
+            const peerId = data.peer?.id as string | undefined;
+            highlighted = !!peerId && highlightedId.includes(peerId);
+          } else if (isEdge(el)) {
+            highlighted =
+              el.getId().includes(highlightedId) ||
+              el.getSource().getId() === highlightedId ||
+              el.getTarget().getId() === highlightedId;
+            const leafIds = (data.aggregatedEdgeIds as string[] | undefined) || [];
+            if (!highlighted && leafIds.length) {
+              highlighted = leafIds.some(
+                id =>
+                  id.includes(highlightedId) || id.startsWith(`${highlightedId}.`) || id.endsWith(`.${highlightedId}`)
+              );
+            }
+          }
+        }
+        if (selectedIds.length > 1 && selectedIds.includes(el.getId())) {
+          highlighted = true;
+        }
+
+        if (Boolean(data.highlighted) !== highlighted) {
+          el.setData({ ...data, highlighted });
+        }
+      });
+    });
+  }, [controller, hoveredId, selectedIds]);
+
   //update model on layout / metrics / filters change
   React.useEffect(() => {
     //update graph if layout changes or if resolved group types changed (including via 'auto' resolution)
@@ -432,7 +546,8 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
       prevOptions?.layout !== options.layout ||
       prevOptions?.groupTypes !== options.groupTypes ||
       prevResolvedGroupTypes !== resolvedGroupTypes ||
-      prevOptions.startCollapsed !== options.startCollapsed
+      prevOptions?.startCollapsed !== options.startCollapsed ||
+      prevOptions?.groupEdges !== options.groupEdges
     ) {
       resetGraph();
     }
@@ -470,7 +585,7 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
       if (prevMetricFunction !== metricFunction || prevMetricType !== metricType) {
         //remove edge tags on metrics change
         controller.getElements().forEach(e => {
-          if (e.getType() === 'edge') {
+          if (e.getType() === 'edge' || e.getType() === AGGREGATE_EDGE_TYPE) {
             e.setData({
               ...e.getData(),
               tag: undefined,
@@ -521,6 +636,8 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
   useEventListener(hoverEvent, onHover);
   useEventListener(graphLayoutEndEvent, onLayoutEnd);
   useEventListener(graphPositionChangeEvent, onLayoutPositionChange);
+  // Rebuild aggregate edges when groups are collapsed/expanded interactively.
+  useEventListener(nodeCollapseChangeEvent, onCollapseChange);
 
   if (_.isEmpty(metrics) && _.isEmpty(droppedMetrics) && _.isEmpty(expectedNodes)) {
     return (
@@ -531,40 +648,42 @@ export const TopologyContent: React.FC<TopologyContentProps> = ({
   }
 
   return (
-    <TopologyView
-      data-test="topology-view"
-      id="topology-view"
-      controlBar={
-        <TopologyControlBar
-          data-test="topology-control-bar"
-          controlButtons={createTopologyControlButtons({
-            ...defaultControlButtonsOptions,
-            fitToScreen: false,
-            zoomInCallback: () => {
-              if (controller) {
-                controller.getGraph().scaleBy(zoomIn);
-              }
-            },
-            zoomOutCallback: () => {
-              if (controller) {
-                controller.getGraph().scaleBy(zoomOut);
-              }
-            },
-            resetViewCallback: () => {
-              if (controller) {
-                requestFit = true;
-                controller.getGraph().reset();
-                controller.getGraph().layout();
-              }
-            },
-            //TODO: enable legend with display icons and colors
-            legend: false
-          })}
-        />
-      }
-    >
-      <VisualizationSurface data-test="visualization-surface" state={{ selectedIds }} />
-    </TopologyView>
+    <AggregateEdgeSnapContext.Provider value={snapGeneration}>
+      <TopologyView
+        data-test="topology-view"
+        id="topology-view"
+        controlBar={
+          <TopologyControlBar
+            data-test="topology-control-bar"
+            controlButtons={createTopologyControlButtons({
+              ...defaultControlButtonsOptions,
+              fitToScreen: false,
+              zoomInCallback: () => {
+                if (controller) {
+                  controller.getGraph().scaleBy(zoomIn);
+                }
+              },
+              zoomOutCallback: () => {
+                if (controller) {
+                  controller.getGraph().scaleBy(zoomOut);
+                }
+              },
+              resetViewCallback: () => {
+                if (controller) {
+                  requestFit = true;
+                  controller.getGraph().reset();
+                  controller.getGraph().layout();
+                }
+              },
+              //TODO: enable legend with display icons and colors
+              legend: false
+            })}
+          />
+        }
+      >
+        <VisualizationSurface data-test="visualization-surface" state={{ selectedIds }} />
+      </TopologyView>
+    </AggregateEdgeSnapContext.Provider>
   );
 };
 

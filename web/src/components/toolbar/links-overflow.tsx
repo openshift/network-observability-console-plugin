@@ -95,9 +95,7 @@ export const LinksOverflow: React.FC<LinksOverflowProps> = ({ id, items, text })
               isExpanded={isOpen}
               onClick={() => setOpen(!isOpen)}
             >
-              <>
-                <EllipsisVIcon /> {text || t('More options')}
-              </>
+              {text || t('More options')}
             </MenuToggle>
           )}
         >

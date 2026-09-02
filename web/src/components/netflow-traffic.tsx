@@ -473,37 +473,35 @@ export const NetflowTraffic: React.FC<NetflowTrafficProps> = ({
       <PageSection id="pageSection" className={`${isDarkTheme ? 'dark' : 'light'} ${isTab ? 'tab' : ''}`}>
         {!hideTitle && pageHeader()}
         {!_.isEmpty(caps.filterDefs) && (
-          <Flex direction={{ default: 'row' }} style={{ paddingRight: hideTitle ? '1.5rem' : undefined }}>
-            <FlexItem style={{ paddingTop: hideTitle ? '1.8rem' : undefined }} flex={{ default: 'flex_1' }}>
-              <FiltersToolbar
-                id="filter-toolbar"
-                filters={filters}
-                forcedFilters={forcedFilters}
-                setFilters={updateTableFilters}
-                clearFilters={clearFilters}
-                resetFilters={resetDefaultFilters}
-                queryOptionsProps={{
-                  limit,
-                  recordType,
-                  dataSource,
-                  packetLoss,
-                  setLimit,
-                  setRecordType,
-                  setDataSource,
-                  setPacketLoss,
-                  allowLoki: caps.allowLoki,
-                  allowProm: caps.allowProm,
-                  allowFlow: caps.isFlow,
-                  allowConnection: caps.isConnectionTracking,
-                  allowPktDrops: caps.isPktDrop,
-                  useTopK: selectedViewId === 'overview'
-                }}
-                isFullScreen={isFullScreen}
-                setFullScreen={setFullScreen}
-              />
-            </FlexItem>
-            {hideTitle && <FlexItem style={{ alignSelf: 'flex-start' }}>{actions()}</FlexItem>}
-          </Flex>
+          <div className={hideTitle ? 'netobserv-filters-toolbar-item' : undefined}>
+            <FiltersToolbar
+              id="filter-toolbar"
+              filters={filters}
+              forcedFilters={forcedFilters}
+              setFilters={updateTableFilters}
+              clearFilters={clearFilters}
+              resetFilters={resetDefaultFilters}
+              queryOptionsProps={{
+                limit,
+                recordType,
+                dataSource,
+                packetLoss,
+                setLimit,
+                setRecordType,
+                setDataSource,
+                setPacketLoss,
+                allowLoki: caps.allowLoki,
+                allowProm: caps.allowProm,
+                allowFlow: caps.isFlow,
+                allowConnection: caps.isConnectionTracking,
+                allowPktDrops: caps.isPktDrop,
+                useTopK: selectedViewId === 'overview'
+              }}
+              isFullScreen={isFullScreen}
+              setFullScreen={setFullScreen}
+              trailingContent={hideTitle ? actions() : undefined}
+            />
+          </div>
         )}
         {
           <TabsContainer

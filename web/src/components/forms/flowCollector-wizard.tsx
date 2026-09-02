@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import {
   flowCollectorEditPath,
   flowCollectorNewPath,
+  flowCollectorSetupPath,
   flowCollectorStatusPath,
   navigateTo,
   useNavigate,
@@ -35,13 +36,38 @@ export type FlowCollectorWizardProps = {
 
 const defaultPaths = ['spec.namespace', 'spec.networkPolicy'];
 
+const processingPaths = [
+  'spec.deploymentModel',
+  'spec.kafka.address',
+  'spec.kafka.topic',
+  'spec.kafka.tls',
+  'spec.agent.ebpf.privileged',
+  'spec.agent.ebpf.features',
+  'spec.processor.clusterName',
+  'spec.processor.addZone',
+  'spec.processor.consumerReplicas'
+];
+
+const stepPaths: Record<string, string[]> = {
+  overview: defaultPaths,
+  processing: processingPaths,
+  loki: ['spec.loki'],
+  consumption: []
+};
+
 export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
   const { t } = useTranslation('plugin__netobserv-plugin');
   const [schema, setSchema] = React.useState<RJSFSchema | null>(null);
   const [data, setData] = React.useState<any>(null);
-  const [paths, setPaths] = React.useState<string[]>(defaultPaths);
   const params = useParams<{ name?: string }>();
   const navigate = useNavigate();
+  const isSetupRoute = window.location.pathname.startsWith(flowCollectorSetupPath);
+
+  const validSteps = Object.keys(stepPaths);
+  const initialTab = new URLSearchParams(window.location.search).get('tab');
+  const initialStepId = initialTab && validSteps.includes(initialTab) ? initialTab : 'overview';
+  const [startIndex] = React.useState(validSteps.indexOf(initialStepId) + 1);
+  const [paths, setPaths] = React.useState<string[]>(stepPaths[initialStepId]);
 
   const form = React.useCallback(
     (errors?: string[]) => {
@@ -67,28 +93,8 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
   );
 
   const onStepChange = React.useCallback((_event: React.MouseEvent<HTMLButtonElement>, step: WizardStepType) => {
-    switch (step.id) {
-      case 'overview':
-        setPaths(defaultPaths);
-        break;
-      case 'processing':
-        setPaths([
-          'spec.deploymentModel',
-          'spec.kafka.address',
-          'spec.kafka.topic',
-          'spec.kafka.tls',
-          'spec.agent.ebpf.privileged',
-          'spec.agent.ebpf.features',
-          'spec.processor.clusterName',
-          'spec.processor.addZone',
-          'spec.processor.consumerReplicas'
-        ]);
-        break;
-      case 'loki':
-        setPaths(['spec.loki']);
-        break;
-      default:
-        setPaths([]);
+    if (step.id) {
+      setPaths(stepPaths[step.id as string] ?? []);
     }
   }, []);
 
@@ -108,7 +114,7 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
       group="flows.netobserv.io"
       version="v1beta2"
       kind="FlowCollector"
-      name={params.name || props.name || 'cluster'} // fallback on cluster to ensure it doesn't already exists
+      name={isSetupRoute ? 'cluster' : params.name || props.name || 'cluster'}
       skipCRError
       onSuccess={() => {
         navigate(flowCollectorStatusPath);
@@ -120,7 +126,8 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
           // redirect to edit page if resource already exists or is created while using the wizard
           // We can't handle edition here since this page doesn't include ResourceYAMLEditor
           // which handle reload / update buttons
-          if (ctx.data.metadata?.resourceVersion) {
+          // Skip redirect when accessed via /setup route (e.g. from the sampling banner)
+          if (ctx.data.metadata?.resourceVersion && !isSetupRoute) {
             navigate(flowCollectorEditPath);
           }
           // first init schema & data when watch resource query got results
@@ -128,8 +135,11 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
             setSchema(ctx.schema);
           }
           if (data == null) {
-            // slightly modify default example when creating a new resource
-            if (params.name !== 'cluster') {
+            // when on /setup route, use existing FC data as-is
+            if (isSetupRoute || params.name === 'cluster') {
+              setData(ctx.data);
+            } else {
+              // slightly modify default example when creating a new resource
               const updatedData = _.cloneDeep(ctx.data) as any;
               if (!updatedData.spec) {
                 updatedData.spec = {};
@@ -139,8 +149,6 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
               }
               updatedData.spec.loki.mode = 'LokiStack'; // default to lokistack
               setData(updatedData);
-            } else {
-              setData(ctx.data);
             }
           }
           return (
@@ -151,7 +159,12 @@ export const FlowCollectorWizard: FC<FlowCollectorWizardProps> = props => {
                 </Title>
               </div>
               <div id="wizard-container">
-                <Wizard onStepChange={onStepChange} onSave={() => ctx.onSubmit(data)} onClose={() => navigateTo('/')}>
+                <Wizard
+                  startIndex={startIndex}
+                  onStepChange={onStepChange}
+                  onSave={() => ctx.onSubmit(data)}
+                  onClose={() => navigateTo('/')}
+                >
                   <WizardStep name={t('Overview')} id="overview">
                     <span className="co-pre-line">
                       {t(
