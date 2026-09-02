@@ -65,3 +65,9 @@
 #estimation-table tr.pf-m-selected td {
   font-weight: 700;
 }
+
+/* Fix for slider step labels displaying vertically */
+.pf-v6-c-slider__step-label {
+  white-space: nowrap;
+  min-width: fit-content;
+}

@@ -8,7 +8,12 @@
  */
 import _ from 'lodash';
 import { useCallback, useRef } from 'react';
-import { Link as RouterLink, useNavigate as useRouterNavigate, useParams as useRouterParams } from 'react-router';
+import {
+  Link as RouterLink,
+  useNavigate as useRouterNavigate,
+  useParams as useRouterParams,
+  useSearchParams as useRouterSearchParams
+} from 'react-router';
 
 export { RouterLink as Link };
 
@@ -43,6 +48,8 @@ export const useNavigate = () => {
 export const useParams = <T extends Record<string, string | undefined> = Record<string, string | undefined>>(): T => {
   return useRouterParams() as T;
 };
+
+export const useSearchParams = useRouterSearchParams;
 
 export const netflowTrafficPath = '/netflow-traffic';
 export const flowCollectorBasePath = '/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector';

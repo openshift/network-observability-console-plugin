@@ -222,16 +222,66 @@ span.pf-v6-c-button__icon.pf-m-start {
 }
 
 .netobserv-tab-container {
-    margin-top: 1.5rem;
+    margin-top: 0;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Enable container queries for nested NetObserv layouts in narrow resource tabs */
+    container-type: inline-size;
+    container-name: netobserv-tab;
 }
 
 .netobserv-tab-container>section#pageSection {
     flex: 1 1 auto;
     min-height: 0;
+}
+
+#pageSection.tab {
+    container-type: inline-size;
+    container-name: netobserv-page;
+}
+
+.netobserv-filters-toolbar-item {
+    min-width: 0;
+    padding-right: 1.5rem;
+}
+
+#pageSection.tab #filter-toolbar-search-filters {
+    padding-top: var(--pf-t--global--spacer--md, 1rem);
+}
+
+@container netobserv-tab (max-width: 56rem) {
+    #filter-toolbar {
+        padding-left: var(--pf-t--global--spacer--md, 1rem);
+        padding-right: var(--pf-t--global--spacer--md, 1rem);
+    }
+
+    .filter-search-toolbar-item {
+        flex: 1 1 100%;
+    }
+}
+
+@container netobserv-page (max-width: 56rem) {
+    .filter-search-toolbar-item {
+        flex: 1 1 100%;
+    }
+
+    /* Narrow pane: Time range / Refresh stay on the first row, controls below */
+    div#filter-toolbar-search-filters.netobserv-controls-with-trailing > .pf-v6-c-toolbar__content-section {
+        grid-template-columns: 1fr;
+    }
+
+    div#filter-toolbar-search-filters .netobserv-toolbar-trailing {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    div#filter-toolbar-search-filters .netobserv-toolbar-leading {
+        grid-column: 1;
+        grid-row: 2;
+    }
 }
 
 .chips-popover-close-button {

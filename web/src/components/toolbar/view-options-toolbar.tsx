@@ -234,9 +234,7 @@ export const ViewOptionsToolbar = React.forwardRef<SearchHandle, ViewOptionsTool
             onClick={() => props.setViewOptionOverflowMenuOpen(!props.isViewOptionOverflowMenuOpen)}
             onBlur={() => props.setViewOptionOverflowMenuOpen(false)}
           >
-            <>
-              <EllipsisVIcon /> {t('More options')}
-            </>
+            {t('More options')}
           </MenuToggle>
         )}
       >

@@ -2,7 +2,9 @@ import { NamespaceBar } from '@openshift-console/dynamic-plugin-sdk';
 import { Bullseye, PageSection, Spinner } from '@patternfly/react-core';
 import * as React from 'react';
 import { getRole } from '../api/routes';
+import { config } from '../utils/config';
 import AlertFetcher from './alerts/fetcher';
+import SamplingBanner from './alerts/sampling-banner';
 import { NetflowTraffic, NetflowTrafficProps } from './netflow-traffic';
 
 type Props = NetflowTrafficProps & {};
@@ -46,6 +48,7 @@ class NetflowTrafficParent extends React.Component<Props, State> {
     return (
       <AlertFetcher>
         <>
+          <SamplingBanner samplingValue={config.sampling} />
           {!this.props.forcedNamespace && this.state.role === 'dev' && (
             <NamespaceBar onNamespaceChange={ns => this.setState({ namespace: ns })} />
           )}

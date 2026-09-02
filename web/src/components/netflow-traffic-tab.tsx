@@ -115,7 +115,9 @@ export const NetflowTrafficTab: React.FC<NetflowTrafficTabProps> = ({ match, obj
       case 'StatefulSet':
       case 'DaemonSet':
       case 'Job':
-      case 'CronJob': {
+      case 'CronJob':
+      case 'VirtualMachine':
+      case 'VirtualMachineInstance': {
         // Check for Gateway label on Deployments
         if (obj.kind === 'Deployment') {
           const gatewayLabel = obj.metadata?.labels?.['gateway.networking.k8s.io/gateway-name'];
@@ -127,12 +129,14 @@ export const NetflowTrafficTab: React.FC<NetflowTrafficTabProps> = ({ match, obj
           }
         }
 
+        // Flows enrich VMI (not VM) as owner; VM and VMI share name/namespace.
+        const kind = obj.kind === 'VirtualMachine' ? 'VirtualMachineInstance' : obj.kind;
         setForcedFilters({
           list: [
             {
               def: findFilter(filterDefinitions, 'src_resource')!,
               compare: FilterCompare.equal,
-              values: [{ v: `${obj.kind}.${obj.metadata!.namespace}.${obj.metadata!.name}` }]
+              values: [{ v: `${kind}.${obj.metadata!.namespace}.${obj.metadata!.name}` }]
             }
           ],
           match: 'bidirectional'
