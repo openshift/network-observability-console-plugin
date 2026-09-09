@@ -32,7 +32,7 @@ reviews:
   path_filters:
     # Go generated files
     - "!**/zz_generated.deepcopy.go"
-    - "!vendor/"
+    - "!vendor/**"
     # Generated/transpiled files
     - "!**/*.js.map"
     - "!**/*.d.ts"

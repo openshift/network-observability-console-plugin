@@ -13,7 +13,7 @@ import { BellIcon, ExclamationCircleIcon, ExclamationTriangleIcon, InfoAltIcon }
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { valueFormat } from '../../utils/format';
-import { computeResourceScore, HealthStat } from './health-helper';
+import { computeResourceScore, HealthStat, ScoreBreakdown } from './health-helper';
 
 import './health-card.css';
 
@@ -38,7 +38,8 @@ export const HealthCard: React.FC<HealthCardProps> = ({
 }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
 
-  const score = React.useMemo(() => computeResourceScore(resourceHealth), [resourceHealth]);
+  const breakdown: ScoreBreakdown = React.useMemo(() => computeResourceScore(resourceHealth), [resourceHealth]);
+  const score = breakdown.score;
 
   // Combine counts from both alerts and recording rules
   const criticalCount = React.useMemo(
@@ -152,7 +153,11 @@ export const HealthCard: React.FC<HealthCardProps> = ({
             </ul>
           </FlexItem>
           <FlexItem>
-            <Flex direction={{ default: 'column' }} alignItems={{ default: 'alignItemsCenter' }}>
+            <Flex
+              direction={{ default: 'column' }}
+              alignItems={{ default: 'alignItemsCenter' }}
+              gap={{ default: 'gapNone' }}
+            >
               <FlexItem>
                 <Content
                   component={ContentVariants.small}
@@ -164,7 +169,7 @@ export const HealthCard: React.FC<HealthCardProps> = ({
                 </Content>
               </FlexItem>
               <FlexItem>
-                <Content component={ContentVariants.h1}>
+                <Content component={ContentVariants.p} className="health-card-score">
                   {isNaN(score) || !isFinite(score) ? '-' : valueFormat(score, 1)}
                 </Content>
               </FlexItem>
