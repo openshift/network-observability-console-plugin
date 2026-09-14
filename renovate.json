@@ -42,5 +42,8 @@
         "enabled": false
       }
     ]
+  },
+  "github-actions": {
+    "enabled": false
   }
 }
