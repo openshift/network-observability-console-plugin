@@ -1,20 +1,10 @@
 import { ResourceLink } from '@openshift-console/dynamic-plugin-sdk';
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
-  Flex,
-  FlexItem,
-  Text,
-  TextContent,
-  TextVariants
-} from '@patternfly/react-core';
+import { Card, CardBody, CardHeader, CardTitle, Flex, FlexItem, Text, TextVariants } from '@patternfly/react-core';
 import { BellIcon, ExclamationCircleIcon, ExclamationTriangleIcon, InfoAltIcon } from '@patternfly/react-icons';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { valueFormat } from '../../utils/format';
-import { computeResourceScore, HealthStat } from './health-helper';
+import { computeResourceScore, HealthStat, ScoreBreakdown } from './health-helper';
 
 import './health-card.css';
 
@@ -39,7 +29,8 @@ export const HealthCard: React.FC<HealthCardProps> = ({
 }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
 
-  const score = React.useMemo(() => computeResourceScore(resourceHealth), [resourceHealth]);
+  const breakdown: ScoreBreakdown = React.useMemo(() => computeResourceScore(resourceHealth), [resourceHealth]);
+  const score = breakdown.score;
 
   // Combine counts from both alerts and recording rules
   const criticalCount = React.useMemo(
@@ -101,17 +92,13 @@ export const HealthCard: React.FC<HealthCardProps> = ({
       <CardHeader
         className={hideTitle ? 'card-header-hidden' : 'card-header'}
         selectableActions={{
-          selectableActionId: `health-card-selectable-${name || 'global'}`,
-          selectableActionAriaLabelledby: `health-card-title-${name || 'global'}`,
+          selectableActionId: `selectable-action-${name || 'global'}`,
+          selectableActionAriaLabelledby: `selectable-card-${name || 'global'}`,
           variant: 'single',
           onClickAction: onClick
         }}
       >
-        {hideTitle ? (
-          <span id={`health-card-title-${name || 'global'}`} className="pf-v5-screen-reader">
-            {k8sKind && name ? `${k8sKind} ${name}` : t('Global')}
-          </span>
-        ) : (
+        {!hideTitle ? (
           <Flex
             gap={{ default: 'gapSm' }}
             alignItems={{ default: 'alignItemsCenter' }}
@@ -119,11 +106,15 @@ export const HealthCard: React.FC<HealthCardProps> = ({
           >
             <FlexItem>{icon}</FlexItem>
             <FlexItem>
-              <CardTitle id={`health-card-title-${name || 'global'}`}>
+              <CardTitle id={`selectable-card-${name || 'global'}`}>
                 {k8sKind && name ? <ResourceLink inline={true} kind={k8sKind} name={name} /> : t('Global')}
               </CardTitle>
             </FlexItem>
           </Flex>
+        ) : (
+          <span id={`selectable-card-${name || 'global'}`} className="pf-v5-screen-reader">
+            {name || t('Global')}
+          </span>
         )}
       </CardHeader>
       <CardBody>
@@ -154,25 +145,25 @@ export const HealthCard: React.FC<HealthCardProps> = ({
             </ul>
           </FlexItem>
           <FlexItem>
-            <Flex direction={{ default: 'column' }} alignItems={{ default: 'alignItemsCenter' }}>
+            <Flex
+              direction={{ default: 'column' }}
+              alignItems={{ default: 'alignItemsCenter' }}
+              gap={{ default: 'gapNone' }}
+            >
               <FlexItem>
-                <TextContent>
-                  <Text
-                    component={TextVariants.small}
-                    style={{
-                      color: 'var(--pf-t--global--text--color--subtle)'
-                    }}
-                  >
-                    {t('Score')}
-                  </Text>
-                </TextContent>
+                <Text
+                  component={TextVariants.small}
+                  style={{
+                    color: 'var(--pf-t--global--text--color--subtle)'
+                  }}
+                >
+                  {t('Score')}
+                </Text>
               </FlexItem>
               <FlexItem>
-                <TextContent>
-                  <Text component={TextVariants.h1}>
-                    {isNaN(score) || !isFinite(score) ? '-' : valueFormat(score, 1)}
-                  </Text>
-                </TextContent>
+                <Text component={TextVariants.p} className="health-card-score">
+                  {isNaN(score) || !isFinite(score) ? '-' : valueFormat(score, 1)}
+                </Text>
               </FlexItem>
             </Flex>
           </FlexItem>
