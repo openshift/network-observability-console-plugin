@@ -17,9 +17,9 @@ describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, functi
     })
 
     it("(OCP-68246, aramesha) Verify flowRTT panels", function () {
-        // verify default flowRTT panels are visible
+        // verify default flowRTT panels are visible (2 bytes + 2 RTT = 4)
         cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
-        cy.checkPanelsNum(5);
+        cy.checkPanelsNum(4);
 
         // verify all relevant panels are listed
         cy.openPanelsModal()
@@ -39,13 +39,10 @@ describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, functi
         cy.byTestID(overviewSelectors.resetDefault).click().byTestID(overviewSelectors.save).click()
         netflowPage.waitForLokiQuery()
         cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
-        cy.checkPanelsNum(5);
+        cy.checkPanelsNum(4);
 
-        // verify Query Summary stats for flowRTT
-        // Wait for flows to be collected and metrics to be non-zero (retry up to 120s)
-        cy.get(querySumSelectors.avgRTT, { timeout: 120000 }).should('exist').then(avgRTT => {
-            cy.checkQuerySummary(avgRTT)
-        })
+        // verify Query Summary stats for flowRTT (retries until RTT value is > 0, up to 120s)
+        cy.checkQuerySummary(querySumSelectors.avgRTT, { timeout: 120000 })
     })
 
     it("(OCP-68246, aramesha) Verify default flowRTT column", function () {
