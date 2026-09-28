@@ -14,12 +14,13 @@ describe('(OCP-88966) TLSTracking test', { tags: ['Network_Observability'] }, fu
 
     beforeEach('any TLSTracking test', function () {
         netflowPage.visit()
+        netflowPage.selectView('tls')
     })
 
     it("(OCP-88966, aramesha) Verify TLSTracking panels", function () {
-        // verify default TLSTracking panels are visible
+        // verify TLS Tracking view preset panels are visible
         cy.checkPanel(overviewSelectors.defaultTLSTrackingPanels)
-        cy.checkPanelsNum(4);
+        cy.checkPanelsNum(overviewSelectors.defaultTLSTrackingPanels.length);
 
         // open panels modal and verify all relevant panels are listed
         cy.openPanelsModal()
@@ -29,6 +30,7 @@ describe('(OCP-88966) TLSTracking test', { tags: ['Network_Observability'] }, fu
         cy.get(overviewSelectors.panelsModal).contains('Select all').click();
         cy.get(overviewSelectors.panelsModal).contains('Save').click();
         netflowPage.waitForLokiQuery()
+        // 4 TLS + 4 generic rate panels
         cy.checkPanelsNum(8);
         cy.checkPanel(overviewSelectors.allTLSTrackingPanels)
 
@@ -37,7 +39,7 @@ describe('(OCP-88966) TLSTracking test', { tags: ['Network_Observability'] }, fu
         cy.byTestID(overviewSelectors.resetDefault).click().byTestID(overviewSelectors.save).click()
         netflowPage.waitForLokiQuery()
         cy.checkPanel(overviewSelectors.defaultTLSTrackingPanels)
-        cy.checkPanelsNum(4);
+        cy.checkPanelsNum(overviewSelectors.defaultTLSTrackingPanels.length);
     })
 
     it("(OCP-88966, aramesha) Validate TLSTracking columns", function () {
@@ -45,17 +47,13 @@ describe('(OCP-88966) TLSTracking test', { tags: ['Network_Observability'] }, fu
         cy.byTestID("table-composable").should('exist')
         netflowPage.stopAutoRefresh()
 
-        // verify default TLS column: TLS Version
+        // verify TLS Tracking view preset columns
         cy.byTestID('table-composable').should('exist').within(() => {
             cy.get(colSelectors.tlsVersion).should('exist')
+            cy.get(colSelectors.tlsCipherSuite).should('exist')
+            cy.get(colSelectors.tlsGroup).should('exist')
+            cy.get(colSelectors.tlsTypes).should('exist')
         })
-
-        // select TLS Cipher Suite, TLS Group and TLS Types columns
-        cy.selectAndVerifyColumns([
-            colSelectors.tlsCipherSuite,
-            colSelectors.tlsGroup,
-            colSelectors.tlsTypes
-        ])
 
         // add filter for tls_version= TLS 1.3 and tls_types = ServerHello
         cy.get(filterSelectors.filterInput).type("tls_version=TLS 1.3" + '{enter}')

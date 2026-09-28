@@ -18,12 +18,13 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
 
     beforeEach('any packetDrop test', function () {
         netflowPage.visit()
+        netflowPage.selectView('pktdrop')
     })
 
     it("(OCP-66141, aramesha) Verify packetDrop panels", function () {
-        // verify default PacketDrop panels are visible
+        // verify Packet Drops view preset panels are visible
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
 
         // open panels modal and verify all relevant panels are listed
         cy.openPanelsModal();
@@ -33,6 +34,7 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
         cy.get(overviewSelectors.panelsModal).contains('Select all').click();
         cy.get(overviewSelectors.panelsModal).contains('Save').click();
         netflowPage.waitForLokiQuery()
+        // 6 drop + 4 generic rate panels
         cy.checkPanelsNum(10);
 
         netflowPage.waitForLokiQuery()
@@ -42,7 +44,7 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
         cy.openPanelsModal().byTestID(overviewSelectors.resetDefault).click().byTestID(overviewSelectors.save).click()
         netflowPage.waitForLokiQuery()
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
     })
 
     it("(OCP-66141, aramesha) Verify packetDrop Query Options filters", function () {

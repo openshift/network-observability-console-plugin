@@ -80,12 +80,14 @@ describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['
         cy.url({ timeout: 30000 }).should('include', '/netflow-traffic')
         cy.get('#overview-container', { timeout: 60000 }).should('exist')
 
-        // Verify PacketDrop data is seen
+        // Verify PacketDrop data is seen in Packet Drops view
         cy.get('li.overviewTabButton', { timeout: 30000 }).trigger('click')
         netflowPage.clearAllFilters()
         netflowPage.setAutoRefresh()
+        netflowPage.selectView('pktdrop')
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
+        netflowPage.selectView('all')
         cy.checkNetflowTraffic()
         netflowPage.resetClearFilters()
     })

@@ -23,6 +23,16 @@ export function getMemoryUsageMB(): number {
     return Math.round((window.performance as any).memory?.usedJSHeapSize / 1048576)
 }
 
+export type ViewId =
+    | 'all'
+    | 'pktdrop'
+    | 'dns'
+    | 'rtt'
+    | 'tls'
+    | 'udn'
+    | 'networkEvents'
+    | 'packetTranslation'
+
 export const netflowPage = {
     visit: (clearfilters = true) => {
         // Only clear NetObserv settings — full clearLocalStorage drops Console session
@@ -60,6 +70,25 @@ export const netflowPage = {
         netflowPage.waitForLokiQuery()
 
         cy.byTestID('no-results-found', { timeout: 60000 }).should('not.exist')
+    },
+    /**
+     * Select a feature view from the view selector dropdown.
+     * Feature-specific panels/columns only appear after selecting their view.
+     */
+    selectView: (view: ViewId) => {
+        const viewOptionMap: Record<ViewId, string> = {
+            all: '#view-option-all',
+            pktdrop: '#view-option-pktdrop',
+            dns: '#view-option-dns',
+            rtt: '#view-option-rtt',
+            tls: '#view-option-tls',
+            udn: '#view-option-udn',
+            networkEvents: '#view-option-networkEvents',
+            packetTranslation: '#view-option-packetTranslation'
+        }
+        cy.get('[data-test="view-selector-dropdown"]').click()
+        cy.get(viewOptionMap[view]).click()
+        netflowPage.waitForLokiQuery()
     },
     waitForFilterToolbar: () => {
         cy.get(
@@ -309,6 +338,9 @@ export namespace colSelectors {
     export const tlsCipherSuite = '#TLSCipherSuite'
     export const tlsGroup = '#TLSGroup'
     export const tlsTypes = '#TLSTypes'
+    export const udns = '#Udns'
+    export const dropBytes = '#PktDropBytes'
+    export const dropPackets = '#PktDropPackets'
 }
 
 export namespace filterSelectors {
@@ -374,16 +406,50 @@ export namespace overviewSelectors {
     export const manageDNSTrackingPanelsList = ['Top X DNS response code with total (donut or bars and lines)', 'Top X average DNS latencies with overall (donut or lines)', 'Bottom X minimum DNS latencies with overall (donut or lines)', 'Top X maximum DNS latencies with overall (donut or lines)', 'Top X 90th percentile DNS latencies with overall (donut or lines)']
     export const manageFlowRTTPanelsList = ['Top X average TCP smoothed Round Trip Time with overall (donut or lines)', 'Bottom X minimum TCP smoothed Round Trip Time with overall (donut or lines)', 'Top X maximum TCP smoothed Round Trip Time with overall (donut or lines)', 'Top X 90th percentile TCP smoothed Round Trip Time with overall (donut or lines)', 'Top X 99th percentile TCP smoothed Round Trip Time with overall (donut or lines)']
     export const manageTLSTrackingPanelsList = ['TLS usage (donut or lines)', 'TLS usage per version (donut or lines)', 'TLS usage per group (donut or lines)', 'TLS usage per cipher suite (donut or lines)']
+    // All Traffic default panels (generic)
     export const defaultPanels = ['Top 5 average bytes rates', 'Top 5 bytes rates stacked with total']
-    export const defaultPacketDropPanels = ['Top 5 packet dropped state stacked with total', 'Top 5 packet dropped cause stacked with total', 'Top 5 average dropped packets rates', 'Top 5 dropped packets rates stacked with total']
-    export const defaultDNSTrackingPanels = ['Top 5 DNS name', 'Top 5 DNS response code', 'Top 5 average DNS latencies with overall', 'Top 5 90th percentile DNS latencies']
-    export const defaultFlowRTTPanels = ['Top 5 average TCP smoothed Round Trip Time with overall', 'Top 5 90th percentile TCP smoothed Round Trip Time']
-    export const defaultTLSTrackingPanels = ['TLS usage (network flows per second)', 'TLS per version (network flows per second)']
+    // Feature view presets — must match viewPresets in web/src/model/views.ts
+    export const defaultPacketDropPanels = [
+        'Top 5 average dropped packets rates',
+        'Top 5 dropped packets rates stacked with total',
+        'Top 5 packet dropped state stacked with total',
+        'Top 5 packet dropped cause stacked with total',
+        'Top 5 average dropped bytes rates',
+        'Top 5 dropped bytes rates stacked with total'
+    ]
+    export const defaultDNSTrackingPanels = [
+        'Top 5 average DNS latencies with overall',
+        'Top 5 90th percentile DNS latencies',
+        'Top 5 99th percentile DNS latencies',
+        'Top 5 maximum DNS latencies',
+        'Top 5 DNS name',
+        'Top 5 DNS response code'
+    ]
+    export const defaultFlowRTTPanels = [
+        'Top 5 average TCP smoothed Round Trip Time with overall',
+        'Top 5 90th percentile TCP smoothed Round Trip Time',
+        'Top 5 99th percentile TCP smoothed Round Trip Time',
+        'Top 5 maximum TCP smoothed Round Trip Time',
+        'Bottom 5 minimum TCP smoothed Round Trip Time'
+    ]
+    export const defaultTLSTrackingPanels = [
+        'TLS usage',
+        'TLS per version',
+        'TLS per group',
+        'TLS per cipher suite'
+    ]
     export const allPanels = defaultPanels.concat(['Top 5 average packets rates', 'Top 5 packets rates'])
-    export const allPacketDropPanels = defaultPacketDropPanels.concat(['Top 5 average dropped bytes rates', 'Top 5 dropped bytes rates stacked with total'])
-    export const allDNSTrackingPanels = defaultDNSTrackingPanels.concat(['Bottom 5 minimum DNS latencies', 'Top 5 maximum DNS latencies', 'Top 5 DNS name'])
-    export const allFlowRTTPanels = defaultFlowRTTPanels.concat(['Bottom 5 minimum TCP smoothed Round Trip Time', 'Top 5 maximum TCP smoothed Round Trip Time', 'Top 5 99th percentile TCP smoothed Round Trip Time'])
-    export const allTLSTrackingPanels = defaultTLSTrackingPanels.concat(['TLS per group (network flows per second)', 'TLS per cipher suite (network flows per second)'])
+    // After "Select all" on a feature-only FC, generic rate panels are also selected
+    export const allDNSTrackingPanels = defaultDNSTrackingPanels.concat(['Bottom 5 minimum DNS latencies'])
+    export const allTLSTrackingPanels = [
+        'TLS usage (network flows per second)',
+        'TLS per version (network flows per second)',
+        'TLS per group (network flows per second)',
+        'TLS per cipher suite (network flows per second)'
+    ]
+    // all packet drop panels and flowRTT panels are displayed by default
+    export const allPacketDropPanels = defaultPacketDropPanels
+    export const allFlowRTTPanels = defaultFlowRTTPanels
 }
 
 export const loadTimes = {
