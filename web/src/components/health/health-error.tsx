@@ -16,7 +16,7 @@ export interface HealthErrorProps {
 
 export const HealthError: React.FC<HealthErrorProps> = ({ title, body }) => {
   return (
-    <div id="netobserv-error-container">
+    <div id="netobserv-error-container" className="health-tab-panel">
       <EmptyState data-test="error-state">
         <EmptyStateHeader titleText={title} headingLevel="h2" icon={<EmptyStateIcon icon={ExclamationCircleIcon} />} />
         <EmptyStateBody className="error-body">

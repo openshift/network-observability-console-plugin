@@ -1,6 +1,6 @@
-import { netflowPage, overviewSelectors, pluginSelectors } from "@views/netflow-page"
-import { Operator } from "@views/netobserv"
-import {flowcollectorStatusPage, flowcollectorStatusSelectors} from "@views/flowcollector-status";
+import { flowcollectorStatusPage, flowcollectorStatusSelectors } from "@views/flowcollector-status";
+import { netflowPage, overviewSelectors, pluginSelectors } from "@views/netflow-page";
+import { Operator } from "@views/netobserv";
 
 describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['Network_Observability'] }, function () {
 
@@ -69,12 +69,14 @@ describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['
             .should('have.attr', 'data-test-reason', 'Ready')
         cy.get(pluginSelectors.openNetworkTraffic).click()
 
-        // Verify PacketDrop data is seen
-        cy.get('li.overviewTabButton').trigger('click')
+        // Verify PacketDrop data is seen in Packet Drops view
+        cy.get('li.overviewTabButton', { timeout: 30000 }).trigger('click')
         netflowPage.clearAllFilters()
         netflowPage.setAutoRefresh()
+        netflowPage.selectView('pktdrop')
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
+        netflowPage.selectView('all')
         cy.checkNetflowTraffic()
         netflowPage.resetClearFilters()
     })

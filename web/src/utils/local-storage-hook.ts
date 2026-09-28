@@ -9,6 +9,7 @@ export const localStorageRefreshKey = 'netflow-traffic-refresh';
 export const localStorageHealthRefreshKey = 'network-health-refresh';
 export const localStorageHealthSummaryExpandedKey = 'network-health-summary-expanded';
 export const localStorageHealthFiltersKey = 'network-health-filters';
+export const localStorageHealthReadonlySummaryExpandedKey = 'network-health-readonly-summary-expanded';
 export const localStorageSizeKey = 'netflow-traffic-size-size';
 export const localStorageViewIdKey = 'netflow-traffic-view-id';
 export const localStorageOverviewTruncateKey = 'netflow-traffic-overview-truncate';
@@ -32,6 +33,9 @@ export const localStorageOverviewDonutDimensionKey = 'netflow-traffic-overview-d
 export const localStorageOverviewMetricsDimensionKey = 'netflow-traffic-overview-metrics-dimension';
 export const localStorageOverviewMetricsTotalDimensionKey = 'netflow-traffic-overview-metrics-total-dimension';
 export const localStorageOverviewKebabKey = 'netflow-traffic-overview-kebab-map';
+export const localStorageActiveViewKey = 'netflow-traffic-active-view';
+export const localStorageGenericColumnPrefsKey = 'netflow-traffic-generic-column-prefs';
+export const localStorageGenericPanelPrefsKey = 'netflow-traffic-generic-panel-prefs';
 export const localStorageSamplingBannerDismissedKey = 'sampling-banner-dismissed';
 
 export interface ArraySelectionOptions {

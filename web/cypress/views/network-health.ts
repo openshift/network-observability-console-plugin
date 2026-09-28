@@ -3,7 +3,13 @@ export namespace networkHealthSelectors {
   export const node = '[id^="pf-tab-per-node"]';
   export const namespace = '[id^="pf-tab-per-namespace"]';
   export const workload = '[id^="pf-tab-per-owner"]';
+  export const ovn = '[data-test="health-context-tab-ovn"]';
+  export const ovnGlobal = '[data-test="health-ovn-tab-global"]';
+  export const ovnNodes = '[data-test="health-ovn-tab-nodes"]';
   export const nodeCard = '[data-test^="health-card-"]';
+  // Clickable action inside a health card: PF5 renders a (screen-reader) radio input,
+  // PF6 renders a button. Match both; callers force-click as the PF5 input is visually hidden.
+  export const cardAction = 'button, input[type="radio"]';
   export const sidePanel = '[data-test="health-drawer-content"]';
   export const createRuleButton = '[data-test="create-health-rule-button"]';
   export const manageRulesButton = '[data-test="manage-health-rules-button"]';
@@ -70,13 +76,19 @@ export namespace networkHealthFiltersSelectors {
 
 export const networkHealth = {
   clickOnAlert: (name: string) => {
-    cy.get(`[data-test^="health-card-${name}"]`, { timeout: 60000 }).eq(0).should('be.visible').find('button').click();
+    cy.get(`[data-test^="health-card-${name}"]`, { timeout: 60000 })
+      .eq(0)
+      .should('be.visible')
+      .find(networkHealthSelectors.cardAction)
+      .first()
+      .click({ force: true });
   },
   verifyAlert: (name: string, mode: string = 'alert', alertText?: string) => {
     cy.get(`[data-test^="health-card-${name}"]`, { timeout: 120000 })
       .eq(0)
       .should('be.visible')
-      .find('button')
+      .find(networkHealthSelectors.cardAction)
+      .first()
       .click({ force: true })
       .then(() => {
         cy.get(networkHealthSelectors.sidePanel).should('be.visible');
@@ -84,7 +96,11 @@ export const networkHealth = {
         if (alertText) {
           cy.contains(alertText).should('exist');
         }
-        cy.get(`[data-test^="health-card-${name}"]`).eq(0).find('button').click({ force: true });
+        cy.get(`[data-test^="health-card-${name}"]`)
+          .eq(0)
+          .find(networkHealthSelectors.cardAction)
+          .first()
+          .click({ force: true });
         cy.get(networkHealthSelectors.sidePanel).should('not.exist');
       });
   },
