@@ -7,43 +7,22 @@ import (
 
 	"github.com/netobserv/network-observability-console-plugin/pkg/config"
 	"github.com/netobserv/network-observability-console-plugin/pkg/utils/constants"
+	"github.com/netobserv/network-observability-console-plugin/pkg/utils/queryparams"
 )
 
 const (
 	topologyDefaultLimit = "100"
 )
 
-type TopologyInput struct {
-	Start          string
-	End            string
-	Top            string
-	RateInterval   string
-	Step           string
-	DataField      string
-	MetricFunction constants.MetricFunction
-	RecordType     constants.RecordType
-	DataSource     constants.DataSource
-	PacketLoss     constants.PacketLoss
-	Aggregate      string
-	Groups         string
-}
-
-func (in *TopologyInput) GetActualDataField() string {
-	switch in.DataField {
-	case constants.MetricTypeFlows, constants.MetricTypeDNSFlows, constants.MetricTypeTLSFlows:
-		return ""
-	default:
-		return in.DataField
-	}
-}
-
+// TopologyQueryBuilder builds LogQL metric queries for topology views.
 type TopologyQueryBuilder struct {
 	*FlowQueryBuilder
-	topology           *TopologyInput
+	topology           *queryparams.TopologyInput
 	aggregateKeyLabels map[string][]string
 }
 
-func NewTopologyQuery(cfg *config.Loki, kl map[string][]string, in *TopologyInput) (*TopologyQueryBuilder, error) {
+// NewTopologyQuery creates a new TopologyQueryBuilder for the given Loki config and topology input.
+func NewTopologyQuery(cfg *config.Loki, kl map[string][]string, in *queryparams.TopologyInput) (*TopologyQueryBuilder, error) {
 	var rt constants.RecordType
 	if slices.Contains(constants.AnyConnectionType, string(in.RecordType)) {
 		rt = "endConnection"
@@ -59,36 +38,7 @@ func NewTopologyQuery(cfg *config.Loki, kl map[string][]string, in *TopologyInpu
 	}, nil
 }
 
-func GetLabelsAndFilter(kl map[string][]string, aggregate, groups string) ([]string, string) {
-	var fields []string
-	var filter string
-	if fields = kl[aggregate]; fields == nil {
-		fields = []string{aggregate}
-		filter = aggregate
-	}
-	if groups != "" {
-		for gr, labels := range kl {
-			if strings.Contains(groups, gr) {
-				for _, label := range labels {
-					if !slices.Contains(fields, label) {
-						fields = append(fields, label)
-					}
-				}
-			}
-		}
-	}
-	return fields, filter
-}
-
-func getFactor(metricType string) string {
-	switch metricType {
-	case constants.MetricTypeFlowRTT:
-		return "/1000000" // nanoseconds to milliseconds
-	default:
-		return ""
-	}
-}
-
+// GetFunctionWithQuantile maps a MetricFunction to its LogQL function name and optional quantile value.
 func GetFunctionWithQuantile(metricFunction constants.MetricFunction) (string, string) {
 	switch metricFunction {
 	case constants.MetricFunctionCount:
@@ -112,13 +62,23 @@ func GetFunctionWithQuantile(metricFunction constants.MetricFunction) (string, s
 	}
 }
 
+func getFactor(metricType string) string {
+	switch metricType {
+	case constants.MetricTypeFlowRTT:
+		return "/1000000" // nanoseconds to milliseconds
+	default:
+		return ""
+	}
+}
+
+// Build constructs the full LogQL topology query URL string.
 func (q *TopologyQueryBuilder) Build() string {
 	top := q.topology.Top
 	if top == "" {
 		top = topologyDefaultLimit
 	}
 
-	labels, extraFilter := GetLabelsAndFilter(q.aggregateKeyLabels, q.topology.Aggregate, q.topology.Groups)
+	labels, extraFilter := queryparams.GetLabelsAndFilter(q.aggregateKeyLabels, q.topology.Aggregate, q.topology.Groups)
 	if q.config.IsLabel(extraFilter) {
 		extraFilter = ""
 	}
@@ -174,11 +134,11 @@ func (q *TopologyQueryBuilder) Build() string {
 	case constants.MetricTypeDNSLatency:
 		q.appendDNSLatencyFilter(sb)
 	case constants.MetricTypeDNSFlows:
-		q.appendDNSFilter(sb)
+		q.appendFilter(sb, "DnsId")
 	case constants.MetricTypeTLSFlows:
 		q.appendTLSFilter(sb)
 	case constants.MetricTypeFlowRTT:
-		q.appendRTTFilter(sb)
+		q.appendFilter(sb, "TimeFlowRttNs")
 	}
 
 	q.appendJSON(sb, true)

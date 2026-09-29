@@ -1,7 +1,7 @@
 import { K8sModel } from '@openshift-console/dynamic-plugin-sdk';
 import * as React from 'react';
 import { Record } from '../api/ipfix';
-import { defaultNetflowMetrics, NetflowMetrics } from '../api/loki';
+import { defaultNetflowMetrics, NetflowMetrics } from '../api/query-response';
 import { StructuredError } from '../utils/errors';
 import { ConfigCapabilities } from '../utils/netflow-capabilities-hook';
 import { Config, defaultConfig } from './config';
@@ -9,7 +9,7 @@ import { Config, defaultConfig } from './config';
 export interface FetchCallbacks {
   metricsRef: React.MutableRefObject<NetflowMetrics>;
   setFlows: (v: Record[]) => void;
-  setMetrics: (v: NetflowMetrics) => void;
+  setMetrics: React.Dispatch<React.SetStateAction<NetflowMetrics>>;
   setError: (err?: StructuredError | string) => void;
 }
 
@@ -40,7 +40,8 @@ const defaultCaps: ConfigCapabilities = {
   quickFilters: [],
   defaultFilters: [],
   flowQuery: {} as ConfigCapabilities['flowQuery'],
-  fetchFunctions: {} as ConfigCapabilities['fetchFunctions']
+  fetchFunctions: {} as ConfigCapabilities['fetchFunctions'],
+  availableViews: []
 };
 
 const defaultFetchCallbacks: FetchCallbacks = {

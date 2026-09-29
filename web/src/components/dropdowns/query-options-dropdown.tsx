@@ -34,7 +34,13 @@ export const QueryOptionsDropdown: React.FC<QueryOptionsProps> = props => {
 
   const trigger = React.useCallback(() => {
     return (
-      <Button ref={triggerRef} variant="link" onClick={() => setOpen(!isOpen)} data-test="query-options-dropdown">
+      <Button
+        ref={triggerRef}
+        variant="link"
+        className="overflow-button"
+        onClick={() => setOpen(!isOpen)}
+        data-test="query-options-dropdown"
+      >
         {t('Query options')}
       </Button>
     );

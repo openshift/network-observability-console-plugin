@@ -96,8 +96,8 @@ module.exports = {
       pluginMetadata: {
         name: "netobserv-plugin",
         version: "0.1.0",
-        displayName: "NetObserv Plugin for OCP Console",
-        description: "This plugin adds network observability pages to Openshift console",
+        displayName: "NetObserv Plugin for the OpenShift Console",
+        description: "This plugin adds network observability views to the OpenShift Console",
         exposedModules: {
           "netflowParent": "./components/netflow-traffic-parent.tsx",
           "netflowTab": "./components/netflow-traffic-tab.tsx",
@@ -438,6 +438,40 @@ module.exports = {
           }
         },
         {
+          type: "console.tab/horizontalNav",
+          properties: {
+            model: {
+              version: "v1",
+              group: "kubevirt.io",
+              kind: "VirtualMachine"
+            },
+            component: {
+              "$codeRef": "netflowTab.default"
+            },
+            "page": {
+              name: "%plugin__netobserv-plugin~Network Traffic%",
+              "href": "netflow"
+            }
+          }
+        },
+        {
+          type: "console.tab/horizontalNav",
+          properties: {
+            model: {
+              version: "v1",
+              group: "kubevirt.io",
+              kind: "VirtualMachineInstance"
+            },
+            component: {
+              "$codeRef": "netflowTab.default"
+            },
+            "page": {
+              name: "%plugin__netobserv-plugin~Network Traffic%",
+              "href": "netflow"
+            }
+          }
+        },
+        {
           type: "console.tab",
           properties: {
             "contextId": "dev-console-observe",
@@ -453,8 +487,8 @@ module.exports = {
     }),
     new CopyWebpackPlugin({
       patterns: [
-        { from: path.resolve(__dirname, 'locales'), to: 'locales' },
-        { from: path.resolve(__dirname, 'assets'), to: 'assets' },
+        { from: 'locales', to: 'locales', context: __dirname },
+        { from: 'assets', to: 'assets', context: __dirname },
       ],
     }),
   ],
@@ -475,23 +509,27 @@ if (process.env.FLAVOR === 'static') {
       pluginMetadata: {
         name: "netobserv-plugin-static",
         version: "0.1.0",
-        displayName: "NetObserv Static Plugin for OCP Console",
-        description: "This plugin adds custom forms for FlowCollector, FlowCollectorSlice and FlowMetrics APIs",
+        displayName: "NetObserv Static Plugin for the OpenShift Console",
+        description: "This plugin adds custom forms and wizards for FlowCollector, FlowCollectorSlice, FlowMetric and Health Rules APIs",
         exposedModules: {
-          "flowCollectorWizard": "./components/forms/flowCollector-wizard.tsx",
-          "flowCollectorForm": "./components/forms/flowCollector.tsx",
-          "flowCollectorStatus": "./components/forms/flowCollector-status.tsx",
-          "flowCollectorSliceForm": "./components/forms/flowCollectorSlice.tsx",
-          "flowMetricWizard": "./components/forms/flowMetric-wizard.tsx",
-          "flowMetricForm": "./components/forms/flowMetric.tsx"
+          "flowCollectorWizard": "./components/forms/flowCollector/wizard.tsx",
+          "flowCollectorForm": "./components/forms/flowCollector/form.tsx",
+          "flowCollectorStatus": "./components/forms/flowCollector/status.tsx",
+          "flowCollectorSliceForm": "./components/forms/flowCollectorSlice/form.tsx",
+          "flowMetricWizard": "./components/forms/flowMetric/wizard.tsx",
+          "flowMetricForm": "./components/forms/flowMetric/form.tsx",
+          "healthRuleWizard": "./components/forms/healthRule/wizard.tsx",
         },
       },
       extensions: [
         {
           type: "console.page/route",
           properties: {
-            // add FlowCollector wizard to 'Installed Operator' -> 'Create' action
-            path: "/k8s/ns/:namespace/operators.coreos.com~v1alpha1~ClusterServiceVersion/:operator/flows.netobserv.io~v1beta2~FlowCollector/~new",
+            path: [
+              // add FlowCollector wizard to 'Installed Operator' -> 'Create' action
+              "/k8s/ns/:namespace/operators.coreos.com~v1alpha1~ClusterServiceVersion/:operator/flows.netobserv.io~v1beta2~FlowCollector/~new",
+              "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/setup"
+            ],
             component: {
               "$codeRef": "flowCollectorWizard.default"
             }
@@ -503,7 +541,8 @@ if (process.env.FLAVOR === 'static') {
             path: [
               // add FlowCollector form to standard 'New' and 'Edit' actions
               "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/~new",
-              "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/:name"
+              "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/edit",
+              "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/cluster/yaml"
             ],
             component: {
               "$codeRef": "flowCollectorForm.default"
@@ -513,7 +552,11 @@ if (process.env.FLAVOR === 'static') {
         {
           type: "console.page/route",
           properties: {
-            path: "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/status",
+            path: [
+              // existing FlowCollector 'cluster' will be redirected to status page first
+              "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/cluster",
+              "/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/status"
+            ],
             component: {
               "$codeRef": "flowCollectorStatus.default"
             }
@@ -560,13 +603,27 @@ if (process.env.FLAVOR === 'static') {
               "$codeRef": "flowMetricForm.default"
             }
           }
+        },
+        {
+          type: "console.page/route",
+          properties: {
+            path: [
+              "/network-health/rules/setup",
+              "/network-health/rules/template/:template",
+              "/network-health/rules/ns/:namespace/name/:name"
+            ],
+            component: {
+              "$codeRef": "healthRuleWizard.default"
+            }
+          },
+          "flags": { "required": ["CAN_LIST_NS"] }
         }
       ],
     }),
     new CopyWebpackPlugin({
       patterns: [
-        { from: path.resolve(__dirname, 'locales'), to: 'locales' },
-        { from: path.resolve(__dirname, 'assets'), to: 'assets' },
+        { from: 'locales', to: 'locales', context: __dirname },
+        { from: 'assets', to: 'assets', context: __dirname },
       ],
     }),
   ];

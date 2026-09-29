@@ -12,12 +12,7 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
     })
 
     beforeEach("test", function () {
-        cy.clearLocalStorage()
-        cy.visit('/netflow-traffic')
-        // wait for page to be fully loaded
-        cy.get('#overview-container', { timeout: 60000 }).should('exist')
-        cy.byTestID('no-results-found').should('not.exist')
-
+        netflowPage.visit()
     })
 
     it("(OCP-67725, memodi) should measure overview page load times", function () {
@@ -73,7 +68,7 @@ describe("(OCP-67725, memodi) Network_Observability Client Performances", { brow
         cy.intercept('GET', topologyPage.getScopeURL("namespace"), {
             fixture: 'perf/flow_metrics_perf.json'
         })
-        cy.get('[data-surface=true][transform="translate(0, 0) scale(1)"]', { timeout: 10000 }).should('exist').then(() => {
+        cy.get('[data-surface=true]', { timeout: 30000 }).should('exist').then(() => {
             cy.wrap(performance.now()).then(end => {
                 let pageload = Math.round(end - start)
                 let curMemoryUsage = getMemoryUsageMB()

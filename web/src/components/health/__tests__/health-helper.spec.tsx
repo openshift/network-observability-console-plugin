@@ -1,11 +1,16 @@
-import { PrometheusLabels } from '@openshift-console/dynamic-plugin-sdk';
+import { PrometheusLabels, Rule } from '@openshift-console/dynamic-plugin-sdk';
 import {
   AlertState,
+  apportionToOneDecimal,
   buildStats,
+  collectAvailableNamespaces,
   computeHealthItemScore,
   computeResourceScore,
   HealthItem,
   HealthStat,
+  isSilenced,
+  NamedItem,
+  rulesToHealthItems,
   Severity
 } from '../health-helper';
 
@@ -104,28 +109,31 @@ describe('health helpers, score', () => {
       other: { firing: [], pending: [], silenced: [], inactive: [], recording: [] },
       score: 0
     };
-    expect(computeResourceScore(r)).toEqual(10);
+    expect(computeResourceScore(r).score).toEqual(10);
 
-    // Add 3 inactive alerts => still max score
+    // Add 3 inactive alerts => still max score (inactive rules are excluded from the score, so with
+    // nothing active the resource stays at a perfect 10)
     r.critical.inactive.push('test-critical');
     r.warning.inactive.push('test-warning');
     r.other.inactive.push('test-info');
-    expect(computeResourceScore(r)).toEqual(10);
+    expect(computeResourceScore(r).score).toEqual(10);
 
-    // Turn the inactive info into pending => slightly decreasing score
+    // Turn the inactive info into pending => score reflects ONLY the active (pending info) rule; the two
+    // remaining inactive rules no longer prop the score up toward 10.
     r.other.inactive = [];
     r.other.pending = [mockAlert('test-info', 'info', 'pending', 10, 20)];
-    expect(computeResourceScore(r)).toBeCloseTo(9.98, 2);
+    expect(computeResourceScore(r).score).toBeCloseTo(9.56, 2);
 
-    // Turn the inactive warning into firing => more decreasing score
+    // Turn the inactive warning into firing => averaged over the two active rules (still ignoring the
+    // inactive critical), so the firing warning drags the score down further.
     r.warning.inactive = [];
     r.warning.firing = [mockAlert('test-warning', 'warning', 'firing', 10, 40)];
-    expect(computeResourceScore(r)).toBeCloseTo(8.92, 2);
+    expect(computeResourceScore(r).score).toBeCloseTo(7.04, 2);
 
     // Turn the inactive critical into firing => more decrease
     r.critical.inactive = [];
     r.critical.firing = [mockAlert('test-critical', 'critical', 'firing', 10, 40)];
-    expect(computeResourceScore(r)).toBeCloseTo(5.11, 2);
+    expect(computeResourceScore(r).score).toBeCloseTo(5.11, 2);
   });
 });
 
@@ -153,5 +161,152 @@ describe('health helpers, grouping', () => {
     expect(s.byOwner[0].name).toEqual('w');
     expect(s.byOwner[0].score).toBeCloseTo(7.5, 2);
     expect(s.byOwner[0].warning.firing.length).toEqual(1);
+  });
+
+  it('should filter out items via the optional predicate before aggregating', () => {
+    const a1 = mockAlert('test1', 'info', 'pending', 15, 10, { namespace: 'a' });
+    const a2 = mockAlert('test2', 'warning', 'firing', 20, 30, { namespace: 'a' });
+    const b = mockAlert('test2', 'warning', 'firing', 20, 30, { namespace: 'b' });
+
+    const onlyCritical = (item: NamedItem) => item.severity === 'critical';
+    const s = buildStats([a1, a2, b], onlyCritical);
+    // Nothing is critical => every resource is dropped entirely (not just emptied)
+    expect(s.byNamespace).toEqual([]);
+    expect(s.global.score).toEqual(10);
+
+    // For Namespace-superkind items, the resolved namespace value is exposed as `name` (see toNamedItem).
+    const onlyNamespaceA = (item: NamedItem) => item.name === 'a';
+    const filtered = buildStats([a1, a2, b], onlyNamespaceA);
+    expect(filtered.byNamespace.length).toEqual(1);
+    expect(filtered.byNamespace[0].name).toEqual('a');
+  });
+
+  it('should round impacts so they still add up exactly to the rounded total', () => {
+    // Values whose naive per-item rounding drifts from the rounded total.
+    const values = [0.25, 0.25, 0.25, 0.25, 1.5];
+    const rounded = apportionToOneDecimal(values);
+    // Each result is a clean multiple of 0.1
+    rounded.forEach(v => expect(Math.round(v * 10)).toBeCloseTo(v * 10, 10));
+    // Manual sum of the displayed values reconciles with the rounded total.
+    const displayedSum = rounded.reduce((s, v) => s + v, 0);
+    const rawTotal = values.reduce((s, v) => s + v, 0);
+    expect(Math.round(displayedSum * 10) / 10).toEqual(Math.round(rawTotal * 10) / 10);
+  });
+
+  it('should preserve the rounded total for a realistic score breakdown', () => {
+    const items = [
+      mockAlert('a', 'critical', 'firing', 10, 20),
+      mockAlert('b', 'warning', 'firing', 10, 12),
+      mockAlert('c', 'info', 'pending', 10, 11)
+    ];
+    const breakdown = computeResourceScore(buildStats(items).global);
+    const totalWeight = breakdown.details.reduce((sum, d) => sum + d.weight, 0);
+    const pointsLost = breakdown.details.map(d => ((10 - d.rawScore) * d.weight) / totalWeight);
+    const displayed = apportionToOneDecimal(pointsLost);
+    const displayedSum = displayed.reduce((s, v) => s + v, 0);
+    // Displayed per-rule impacts sum to the same 1-decimal value as (10 - score).
+    expect(Math.round(displayedSum * 10) / 10).toEqual(Math.round((10 - breakdown.score) * 10) / 10);
+  });
+
+  it('should collect distinct namespace values from the unfiltered dataset', () => {
+    const a1 = mockAlert('test1', 'info', 'pending', 15, 10, { namespace: 'a' });
+    const a2 = mockAlert('test2', 'warning', 'firing', 20, 30, { namespace: 'a' });
+    const b = mockAlert('test3', 'warning', 'firing', 20, 30, { namespace: 'b' });
+    const w = mockAlert('test4', 'warning', 'firing', 20, 30, { namespace: 'c', workload: 'w', kind: 'k' });
+    const g = mockAlert('test5', 'warning', 'firing', 20, 30, {});
+
+    expect(collectAvailableNamespaces([a1, a2, b, w, g])).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('isSilenced', () => {
+  it('matches positive equality matchers', () => {
+    expect(isSilenced([{ name: 'alertname', value: 'Foo' }], { alertname: 'Foo' })).toBe(true);
+    expect(isSilenced([{ name: 'alertname', value: 'Foo' }], { alertname: 'Bar' })).toBe(false);
+  });
+
+  it('honors negative and regex matchers', () => {
+    expect(isSilenced([{ name: 'severity', value: 'info', isEqual: false }], { severity: 'warning' })).toBe(true);
+    expect(isSilenced([{ name: 'alertname', value: 'Foo.*', isRegex: true }], { alertname: 'FooBar' })).toBe(true);
+    expect(isSilenced([{ name: 'alertname', value: 'Foo.*', isRegex: true }], { alertname: 'Bar' })).toBe(false);
+  });
+
+  it('negative matcher matches when label is absent', () => {
+    // {severity!="info"} should match when the label is entirely absent
+    expect(isSilenced([{ name: 'severity', value: 'info', isEqual: false }], {})).toBe(true);
+  });
+
+  it('negative matcher matches when label value is empty', () => {
+    // {severity!="info"} should match when the label is present but empty
+    expect(isSilenced([{ name: 'severity', value: 'info', isEqual: false }], { severity: '' })).toBe(true);
+  });
+
+  it('negative matcher does not match when label equals the matcher value', () => {
+    expect(isSilenced([{ name: 'severity', value: 'info', isEqual: false }], { severity: 'info' })).toBe(false);
+  });
+
+  it('anchors alternation as a whole (RE2 full-match semantics)', () => {
+    const m = [{ name: 'alertname', value: 'foo|bar', isRegex: true }];
+    expect(isSilenced(m, { alertname: 'foo' })).toBe(true);
+    expect(isSilenced(m, { alertname: 'bar' })).toBe(true);
+    // Must NOT match partial values that a non-grouped "^foo|bar$" would wrongly accept.
+    expect(isSilenced(m, { alertname: 'fooBaz' })).toBe(false);
+    expect(isSilenced(m, { alertname: 'Bazbar' })).toBe(false);
+  });
+});
+
+describe('rulesToHealthItems, malformed annotation', () => {
+  const ruleWithAnnotation = (netobservHealth: string): Rule =>
+    ({
+      name: 'ThirdPartyAlert',
+      annotations: {
+        summary: 'Third party summary',
+        netobserv_io_network_health: netobservHealth
+      },
+      labels: { severity: 'critical' },
+      alerts: [
+        {
+          state: 'firing',
+          labels: { severity: 'critical' },
+          annotations: { summary: 'Third party summary' },
+          value: '1'
+        }
+      ]
+    } as unknown as Rule);
+
+  it('falls back to default metadata (and logs) instead of throwing on truncated JSON', () => {
+    // Regression: a third-party rule with a truncated netobserv_io_network_health value used to throw
+    // from JSON.parse and take down the whole Network Health page. It must now degrade gracefully.
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const malformed = '{"contextTab":"kiali","displayName":"Truncated"';
+      expect(() => rulesToHealthItems([ruleWithAnnotation(malformed)], {}, [])).not.toThrow();
+      const items = rulesToHealthItems([ruleWithAnnotation(malformed)], {}, []);
+      expect(items).toHaveLength(1);
+      // Default metadata unit is used since the annotation could not be parsed.
+      expect(items[0].metadata.unit).toBe('%');
+      expect(items[0].summary).toBe('Third party summary');
+      // The parse failure is surfaced to the console rather than silently swallowed.
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+describe('isSilenced, regex compilation', () => {
+  it('does not apply a silence whose regex JS cannot compile, and logs it', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      // RE2 inline flags like "(?i)foo" are valid for Alertmanager but throw in JS RegExp.
+      expect(isSilenced([{ name: 'alertname', value: '(?i)foo', isRegex: true }], { alertname: 'FOO' })).toBe(false);
+      // A negative matcher with an unevaluable regex must also not silence the alert.
+      expect(
+        isSilenced([{ name: 'alertname', value: '(?i)foo', isRegex: true, isEqual: false }], { alertname: 'bar' })
+      ).toBe(false);
+      expect(errorSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

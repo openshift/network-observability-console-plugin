@@ -1,7 +1,7 @@
 ARG BUILDVERSION
 ARG BUILDVERSION_Y
 
-FROM registry.access.redhat.com/ubi9/nodejs-22:9.8-1777524498 as web-builder
+FROM registry.access.redhat.com/ubi9/nodejs-22:9.8-1790572348 as web-builder
 
 WORKDIR /opt/app-root
 
@@ -19,7 +19,7 @@ WORKDIR /opt/app-root/web
 RUN TRANSPILE_ONLY=true npm run build
 RUN TRANSPILE_ONLY=true npm run build:static
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.25 as go-builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.26 as go-builder
 
 ARG BUILDVERSION
 
@@ -34,7 +34,7 @@ COPY pkg/ pkg/
 ENV GOEXPERIMENT strictfipsruntime
 RUN go build -tags strictfipsruntime -ldflags "-X 'main.buildVersion=$BUILDVERSION' -X 'main.buildDate=`date +%Y-%m-%d\ %H:%M`'" -mod vendor -o plugin-backend cmd/plugin-backend.go
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1777460003
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:9.8-1790215907
 ARG BUILDVERSION
 ARG BUILDVERSION_Y
 

@@ -1,8 +1,8 @@
 import { Operator } from "@views/netobserv"
 import { netflowPage, overviewSelectors } from "@views/netflow-page"
 
-function getPacketDropURL(drop: string): string {
-    return `**/netflow-traffic**packetLoss=${drop}`
+function getPacketDropURL(drop: string): RegExp {
+    return new RegExp(`loki/flow/records.*packetLoss=${drop}`)
 }
 
 describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, function () {
@@ -18,12 +18,13 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
 
     beforeEach('any packetDrop test', function () {
         netflowPage.visit()
+        netflowPage.selectView('pktdrop')
     })
 
     it("(OCP-66141, aramesha) Verify packetDrop panels", function () {
-        // verify default PacketDrop panels are visible
+        // verify Packet Drops view preset panels are visible
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
 
         // open panels modal and verify all relevant panels are listed
         cy.openPanelsModal();
@@ -33,6 +34,7 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
         cy.get(overviewSelectors.panelsModal).contains('Select all').click();
         cy.get(overviewSelectors.panelsModal).contains('Save').click();
         netflowPage.waitForLokiQuery()
+        // 6 drop + 4 generic rate panels
         cy.checkPanelsNum(10);
 
         netflowPage.waitForLokiQuery()
@@ -42,7 +44,7 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
         cy.openPanelsModal().byTestID(overviewSelectors.resetDefault).click().byTestID(overviewSelectors.save).click()
         netflowPage.waitForLokiQuery()
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
     })
 
     it("(OCP-66141, aramesha) Verify packetDrop Query Options filters", function () {
@@ -50,23 +52,23 @@ describe('(OCP-66141) PacketDrop test', { tags: ['Network_Observability'] }, fun
         cy.byTestID("table-composable").should('exist')
 
         // toggle between drops filter
-        cy.changeQueryOption('Fully dropped');
-        netflowPage.waitForLokiQuery()
         cy.intercept('GET', getPacketDropURL('dropped'), {
             fixture: 'flowmetrics/fully_dropped.json'
-        }).as('matchedUrl')
+        }).as('fullyDropped')
+        cy.changeQueryOption('Fully dropped')
+        cy.wait('@fullyDropped', { timeout: 30000 })
 
-        cy.changeQueryOption('Without drops')
-        netflowPage.waitForLokiQuery()
-        cy.intercept('GET', getPacketDropURL('hasDrops'), {
-            fixture: 'flowmetrics/without_drops.json'
-        }).as('matchedUrl')
-
-        cy.changeQueryOption('Containing drops')
-        netflowPage.waitForLokiQuery()
         cy.intercept('GET', getPacketDropURL('sent'), {
+            fixture: 'flowmetrics/without_drops.json'
+        }).as('withoutDrops')
+        cy.changeQueryOption('Without drops')
+        cy.wait('@withoutDrops', { timeout: 30000 })
+
+        cy.intercept('GET', getPacketDropURL('hasDrops'), {
             fixture: 'flowmetrics/containing_drops.json'
-        }).as('matchedUrl')
+        }).as('containingDrops')
+        cy.changeQueryOption('Containing drops')
+        cy.wait('@containingDrops', { timeout: 30000 })
     })
 
     afterEach("test", function () {

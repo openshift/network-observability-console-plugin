@@ -5,6 +5,7 @@ import DefaultEdge from '../components/edge';
 
 type StyleEdgeProps = {
   element: Edge;
+  'data-test'?: string;
 } & WithSelectionProps;
 
 const StyleEdge: React.FC<StyleEdgeProps> = ({ element, ...rest }) => {
@@ -15,6 +16,7 @@ const StyleEdge: React.FC<StyleEdgeProps> = ({ element, ...rest }) => {
     const newData = { ...data };
     if (detailsLevel !== ScaleDetailsLevel.high) {
       newData.tag = undefined;
+      newData.tagTlsSecure = undefined;
     }
     Object.keys(newData).forEach(key => {
       if (newData[key] === undefined) {

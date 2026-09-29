@@ -46,11 +46,11 @@ endif
 
 ifneq ($(CLEAN_BUILD),)
 	BUILD_DATE := $(shell date +%Y-%m-%d\ %H:%M)
-	BUILD_SHA := $(shell git rev-parse --short HEAD)
+	BUILD_SHA := $(shell git rev-parse --short=8 HEAD)
 	LDFLAGS ?= -X 'main.buildVersion=${VERSION}-${BUILD_SHA}' -X 'main.buildDate=${BUILD_DATE}'
 endif
 
-GOLANGCI_LINT_VERSION = v2.8.0
+GOLANGCI_LINT_VERSION = v2.12.2
 NPM_INSTALL ?= install
 CMDLINE_ARGS ?= --loglevel trace --config config/config.yaml
 
@@ -121,15 +121,15 @@ endif
 
 .PHONY: start
 start: YQ build-backend install-frontend ## Run backend and frontend
-	$(YQ) '.server.port |= 9002 | .server.metricsPort |= 9003 | .loki.useMocks |= false' ./config/sample-config.yaml > ./config/config.yaml
+	$(YQ) '.server.port |= 9002 | .server.metricsPort |= 9003 | .consoleMode |= "Standalone"' ./config/sample-config.yaml > ./config/config.yaml
 	@echo "### Starting backend on http://localhost:9002"
-	bash -c "trap 'fuser -k 9002/tcp' EXIT; \
+	bash -c "trap 'lsof -ti tcp:9002 | xargs kill -9 2>/dev/null || true' EXIT; \
 					./plugin-backend $(CMDLINE_ARGS) & cd web && npm run start"
 
 .PHONY: start-backend
 start-backend: YQ build-backend
-	$(YQ) '.server.port |= 9002 | .server.metricsPort |= 9003 | .loki.useMocks |= false' ./config/sample-config.yaml > ./config/config.yaml
-	bash -c "trap 'fuser -k 9002/tcp' EXIT; \
+	$(YQ) '.server.port |= 9002 | .server.metricsPort |= 9003 | .consoleMode |= "Standalone"' ./config/sample-config.yaml > ./config/config.yaml
+	bash -c "trap 'lsof -ti tcp:9002 | xargs kill -9 2>/dev/null || true' EXIT; \
 					./plugin-backend $(CMDLINE_ARGS)"
 
 .PHONY: bridge
@@ -181,12 +181,13 @@ fmt-backend: ## Run backend go fmt
 .PHONY: lint-backend
 lint-backend: prereqs ## Lint backend code
 	@echo "### Linting backend code"
-	./bin/golangci-lint-${GOLANGCI_LINT_VERSION} run ./...
+	./bin/golangci-lint-${GOLANGCI_LINT_VERSION} run ./cmd/... ./pkg/...
 
 .PHONY: test-backend
 test-backend: ## Test backend using go test
 	@echo "### Testing backend"
-	go test ./... -coverpkg=./... -coverprofile cover.out
+	# Limit to cmd/pkg — scripts/ (e.g. gen-health-rule-defaults) and web/node_modules are not backend packages.
+	go test ./cmd/... ./pkg/... -coverpkg=./cmd/...,./pkg/... -coverprofile cover.out
 
 ##@ Performance Testing
 
@@ -242,12 +243,12 @@ benchmark-aggregations: ## Run aggregation level benchmarks
 
 .PHONY: serve
 serve: YQ ## Run backend
-	$(YQ) '.server.port |= 9001 | .server.metricsPort |= 9002 | .loki.useMocks |= false' ./config/sample-config.yaml > ./config/config.yaml
+	$(YQ) '.server.port |= 9001 | .server.metricsPort |= 9002 | .consoleMode |= "Standalone"' ./config/sample-config.yaml > ./config/config.yaml
 	./plugin-backend $(CMDLINE_ARGS)
 
 .PHONY: serve-mock
 serve-mock: YQ ## Run backend using mocks
-	$(YQ) '.server.port |= 9001 | .server.metricsPort |= 9002 | .loki.useMocks |= true' ./config/sample-config.yaml > ./config/config.yaml
+	$(YQ) '.server.port |= 9001 | .server.metricsPort |= 9002 | .consoleMode |= "Mock"' ./config/sample-config.yaml > ./config/config.yaml
 	./plugin-backend $(CMDLINE_ARGS)
 
 ##@ Images
@@ -284,8 +285,13 @@ tar-image: MULTIARCH_TARGETS=amd64
 tar-image: image-build ## Build single arch (amd64) and save as a tar
 	$(OCI_BIN) tag $(IMAGE)-amd64 $(IMAGE)
 	mkdir -p ./out
+ifeq (${STANDALONE}, true)
+	$(OCI_BIN) save -o out/image-standalone.tar $(IMAGE)
+	echo $(IMAGE) > ./out/name-standalone
+else
 	$(OCI_BIN) save -o out/image.tar $(IMAGE)
 	echo $(IMAGE) > ./out/name
+endif
 
 include .mk/cypress.mk
 include .mk/shortcuts.mk

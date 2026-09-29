@@ -1,7 +1,7 @@
 import { Content, ContentVariants } from '@patternfly/react-core';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Status } from '../../api/loki';
+import { Status } from '../../api/query-response';
 
 export interface StatusProps {
   status: Status;

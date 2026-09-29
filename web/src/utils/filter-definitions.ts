@@ -54,7 +54,7 @@ export const doubleQuoteValue = '"';
 export const matcher = (left: string, right: string[], compare: FilterCompare) => `${left}${compare}${right.join(',')}`;
 
 const simpleFiltersEncoder = (field: Field): FiltersEncoder => {
-  return (values: FilterValue[], compare: FilterCompare) => {
+  return (values: FilterValue[], compare: FilterCompare, _matchAny: boolean) => {
     return matcher(
       field,
       values.map(v => v.v),
@@ -62,6 +62,49 @@ const simpleFiltersEncoder = (field: Field): FiltersEncoder => {
     );
   };
 };
+
+/**
+ * Endpoint filters (namespace, address, …) encode as src|dst OR. Columns without a single `field`
+ * use `calculated: [SrcFoo,DstFoo]` in config; when that or `filter` is missing (e.g. sample tests),
+ * `endpointDualFieldFallback` supplies the ipfix pair.
+ */
+const parseEndpointCalculatedPair = (calculated: string): [Field, Field] | undefined => {
+  const m = calculated.match(/^\s*\[\s*([A-Za-z0-9_]+)\s*,\s*([A-Za-z0-9_]+)\s*\]\s*$/);
+  if (!m) {
+    return undefined;
+  }
+  return [m[1] as Field, m[2] as Field];
+};
+
+/** When column config has no `filter` key (tests) or no `field`, map endpoint filter id → [src,dst] ipfix fields. */
+const endpointDualFieldFallback: Partial<Record<FilterId, [Field, Field]>> = {
+  namespace: ['SrcK8S_Namespace', 'DstK8S_Namespace'],
+  name: ['SrcK8S_Name', 'DstK8S_Name'],
+  owner_name: ['SrcK8S_OwnerName', 'DstK8S_OwnerName'],
+  address: ['SrcAddr', 'DstAddr'],
+  port: ['SrcPort', 'DstPort'],
+  mac: ['SrcMac', 'DstMac'],
+  host_address: ['SrcK8S_HostIP', 'DstK8S_HostIP'],
+  host_name: ['SrcK8S_HostName', 'DstK8S_HostName'],
+  zone: ['SrcK8S_Zone', 'DstK8S_Zone']
+};
+
+const encodedFilterLabelKeys = (encoded: string): string[] =>
+  encoded
+    .split('|')
+    .flatMap(orSegment => orSegment.split('&'))
+    .map(part => part.split(/=|~/)[0])
+    .filter(Boolean);
+
+/** Endpoint filter: match if either source or destination field satisfies the clause (OR). */
+const endpointEitherSideEncoder =
+  (srcField: Field, dstField: Field): FiltersEncoder =>
+  (values: FilterValue[], compare: FilterCompare, _matchAny: boolean) => {
+    const left = simpleFiltersEncoder(srcField)(values, compare, _matchAny);
+    const right = simpleFiltersEncoder(dstField)(values, compare, _matchAny);
+    const isNegated = compare === FilterCompare.notEqual || compare === FilterCompare.notMatch;
+    return isNegated ? `${left}&${right}` : `${left}|${right}`;
+  };
 
 // As owner / non-owner kind filters are mixed, they are disambiguated via this function
 const kindFiltersEncoder = (base: Field, owner: Field): FiltersEncoder => {
@@ -327,6 +370,18 @@ export const getFilterDefinitions = (
       autocomplete = autocompleteTCPFlags;
     }
 
+    if (d.category === 'endpoint' && !d.id.includes('kind') && !d.id.includes('resource')) {
+      const parsed =
+        colConfig && !colConfig.field && colConfig.calculated
+          ? parseEndpointCalculatedPair(colConfig.calculated)
+          : undefined;
+      const fallback = endpointDualFieldFallback[d.id as FilterId];
+      const pair = parsed || fallback;
+      if (pair) {
+        encoder = endpointEitherSideEncoder(pair[0], pair[1]);
+      }
+    }
+
     return { autocomplete, findOption, validate, encoder, checkCompletion };
   };
 
@@ -371,11 +426,8 @@ export const checkFilterAvailable = (
     const checkVariant = (filter: FilterDefinition | undefined) => {
       if (!filter) return false;
       const q = filter.encoder([{ v: 'any' }], FilterCompare.match, false);
-      const parts = q.split('&');
-      return parts.every(part => {
-        const kv = part.split(/=|~/);
-        return kv.length > 0 && config.promLabels.includes(kv[0]);
-      });
+      const keys = encodedFilterLabelKeys(q);
+      return keys.every(k => config.promLabels.includes(k));
     };
 
     const srcAvailable = checkVariant(srcFilter);
@@ -388,10 +440,9 @@ export const checkFilterAvailable = (
   if (isPromOnly) {
     // "encode" a dummy query to check related labels, and make sure they're all part of available prom labels
     const q = fd.encoder([{ v: 'any' }], FilterCompare.match, false);
-    const parts = q.split('&');
-    for (let i = 0; i < parts.length; i++) {
-      const kv = parts[i].split(/=|~/);
-      if (kv.length === 0 || !config.promLabels.includes(kv[0])) {
+    const keys = encodedFilterLabelKeys(q);
+    for (let i = 0; i < keys.length; i++) {
+      if (!config.promLabels.includes(keys[i])) {
         return false;
       }
     }

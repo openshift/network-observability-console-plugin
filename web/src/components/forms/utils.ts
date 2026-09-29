@@ -4,36 +4,106 @@ import { UiSchema } from '@rjsf/utils';
 import _ from 'lodash';
 import { ClusterServiceVersionKind } from './types';
 
-export type FlowCollectorOverallStatus = 'ready' | 'degraded' | 'pending' | 'error' | 'onHold' | 'loading';
+export type FlowCollectorOverallStatus = 'ready' | 'degraded' | 'pending' | 'error' | 'onHold' | 'deleting' | 'loading';
+
+type K8sErrorLike = {
+  message?: string;
+  code?: number;
+  status?: number;
+  response?: { status?: number };
+  json?: { message?: string; code?: number; reason?: string };
+};
+
+/** Human-readable message from a K8s/Console rejection (avoids "[object Object]"). */
+export const k8sErrorMessage = (error: unknown): string => {
+  if (!error) {
+    return '';
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  const e = error as K8sErrorLike;
+  if (typeof e.message === 'string' && e.message) {
+    return e.message;
+  }
+  if (typeof e.json?.message === 'string' && e.json.message) {
+    return e.json.message;
+  }
+  return String(error);
+};
+
+/** True when a K8s watch/API error indicates the requested resource does not exist. */
+export const isK8sNotFoundError = (error: unknown): boolean => {
+  if (!error) {
+    return false;
+  }
+  const e = error as K8sErrorLike;
+  if (e.code === 404 || e.json?.code === 404 || e.response?.status === 404 || e.status === 404) {
+    return true;
+  }
+  if (e.json?.reason === 'NotFound') {
+    return true;
+  }
+  return /not found/i.test(k8sErrorMessage(error));
+};
+
+/** A 409 means the caller held a stale resourceVersion — re-fetch and retry the write. */
+export const isK8sConflictError = (error: unknown): boolean => {
+  if (!error) {
+    return false;
+  }
+  const e = error as K8sErrorLike;
+  if (e.code === 409 || e.json?.code === 409 || e.response?.status === 409 || e.status === 409) {
+    return true;
+  }
+  if (e.json?.reason === 'Conflict') {
+    return true;
+  }
+  return /conflict|the object has been modified/i.test(k8sErrorMessage(error));
+};
 
 export const getFlowCollectorOverallStatus = (
   cr: K8sResourceKind | undefined,
   loadError: unknown
-): FlowCollectorOverallStatus => {
-  if (loadError) {
-    return 'error';
+): { status: FlowCollectorOverallStatus; message?: string } => {
+  if (loadError && !isK8sNotFoundError(loadError)) {
+    return { status: 'error', message: k8sErrorMessage(loadError) };
   }
   if (!cr) {
-    return 'loading';
+    return { status: 'loading' };
+  }
+  // Prefer this over watch-only: operator ≥1.5 no longer keeps a finalizer, so the
+  // terminating window is often invisible to useK8sWatchResource. Callers can stamp
+  // deletionTimestamp locally after k8sDelete succeeds.
+  if (cr.metadata?.deletionTimestamp) {
+    return { status: 'deleting' };
   }
   if (cr.spec?.execution?.mode === 'OnHold') {
-    return 'onHold';
+    return { status: 'onHold' };
   }
   const conditions = cr.status?.conditions as K8sResourceCondition[] | undefined;
   if (!conditions) {
-    return 'pending';
+    return { status: 'pending' };
   }
+  const message =
+    conditions
+      .filter(c => c.type !== 'Ready' && c.status === 'True' && c.message)
+      .map(c => c.message)
+      .join('; ') || undefined;
   const readyCondition = conditions.find(c => c.type === 'Ready');
   if (readyCondition?.status === 'True') {
     if (readyCondition.reason === 'Ready,Degraded') {
-      return 'degraded';
+      return { status: 'degraded', message };
     }
-    return 'ready';
+    return { status: 'ready' };
   }
   if (readyCondition?.status === 'False') {
-    return readyCondition.reason === 'Pending' ? 'pending' : 'error';
+    return readyCondition.reason === 'Pending' ? { status: 'pending' } : { status: 'error', message };
   }
-  return 'pending';
+  return { status: 'pending' };
 };
 
 export const appendRecursive = (obj: any, key: string, value?: string) => {

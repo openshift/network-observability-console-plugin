@@ -14,12 +14,13 @@ describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, functi
 
     beforeEach('any flowRTT test', function () {
         netflowPage.visit()
+        netflowPage.selectView('rtt')
     })
 
     it("(OCP-68246, aramesha) Verify flowRTT panels", function () {
-        // verify default flowRTT panels are visible
+        // verify Flow RTT view preset panels are visible
         cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
-        cy.checkPanelsNum(5);
+        cy.checkPanelsNum(overviewSelectors.defaultFlowRTTPanels.length);
 
         // verify all relevant panels are listed
         cy.openPanelsModal()
@@ -29,6 +30,7 @@ describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, functi
         cy.get(overviewSelectors.panelsModal).contains('Select all').click();
         cy.get(overviewSelectors.panelsModal).contains('Save').click();
         netflowPage.waitForLokiQuery()
+        // 5 RTT + 4 generic rate panels
         cy.checkPanelsNum(9);
 
         netflowPage.waitForLokiQuery()
@@ -39,13 +41,10 @@ describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, functi
         cy.byTestID(overviewSelectors.resetDefault).click().byTestID(overviewSelectors.save).click()
         netflowPage.waitForLokiQuery()
         cy.checkPanel(overviewSelectors.defaultFlowRTTPanels)
-        cy.checkPanelsNum(5);
+        cy.checkPanelsNum(overviewSelectors.defaultFlowRTTPanels.length);
 
-        // verify Query Summary stats for flowRTT
-        // Wait for flows to be collected and metrics to be non-zero (retry up to 120s)
-        cy.get(querySumSelectors.avgRTT, { timeout: 120000 }).should('exist').then(avgRTT => {
-            cy.checkQuerySummary(avgRTT)
-        })
+        // verify Query Summary stats for flowRTT (retries until RTT value is > 0, up to 120s)
+        cy.checkQuerySummary(querySumSelectors.avgRTT, { timeout: 120000 })
     })
 
     it("(OCP-68246, aramesha) Verify default flowRTT column", function () {
@@ -53,7 +52,7 @@ describe('(OCP-68246) FlowRTT test', { tags: ['Network_Observability'] }, functi
         cy.byTestID("table-composable").should('exist')
         netflowPage.stopAutoRefresh()
 
-        // verify default FowRTT column
+        // verify Flow RTT view preset column
         cy.byTestID('table-composable').should('exist').within(() => {
             cy.get(colSelectors.flowRTT).should('exist')
         })

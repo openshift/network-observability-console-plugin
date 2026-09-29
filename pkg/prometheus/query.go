@@ -3,15 +3,15 @@ package prometheus
 import (
 	"strings"
 
-	"github.com/netobserv/network-observability-console-plugin/pkg/loki"
 	"github.com/netobserv/network-observability-console-plugin/pkg/model/filters"
 	"github.com/netobserv/network-observability-console-plugin/pkg/utils/constants"
+	"github.com/netobserv/network-observability-console-plugin/pkg/utils/queryparams"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
 type QueryBuilder struct {
 	aggregateKeyLabels map[string][]string
-	in                 *loki.TopologyInput
+	in                 *queryparams.TopologyInput
 	filters            filters.SingleQuery
 	orMetrics          []string
 	qRange             v1.Range
@@ -22,7 +22,8 @@ type Query struct {
 	PromQL string
 }
 
-func NewQuery(kl map[string][]string, in *loki.TopologyInput, qr *v1.Range, filters filters.SingleQuery, orMetrics []string) *QueryBuilder {
+// NewQuery creates a new PromQL QueryBuilder for the given topology input.
+func NewQuery(kl map[string][]string, in *queryparams.TopologyInput, qr *v1.Range, filters filters.SingleQuery, orMetrics []string) *QueryBuilder {
 	return &QueryBuilder{
 		aggregateKeyLabels: kl,
 		in:                 in,
@@ -105,14 +106,14 @@ func (q *QueryBuilder) Build() Query {
 		if isHisto {
 			if quantile == "" {
 				// histogram average: sum / count
-				appendRate(&sb, metric+"_sum", q.filters, q.in.RateInterval)
+				appendRateOrIncrease(&sb, false, metric+"_sum", q.filters, q.in.RateInterval)
 				sb.WriteRune('/')
-				appendRate(&sb, metric+"_count", q.filters, q.in.RateInterval)
+				appendRateOrIncrease(&sb, false, metric+"_count", q.filters, q.in.RateInterval)
 			} else {
-				appendRate(&sb, metric+"_bucket", q.filters, q.in.RateInterval)
+				appendRateOrIncrease(&sb, false, metric+"_bucket", q.filters, q.in.RateInterval)
 			}
 		} else {
-			appendRate(&sb, metric, q.filters, q.in.RateInterval)
+			appendRateOrIncrease(&sb, q.in.MetricFunction == constants.MetricFunctionCount, metric, q.filters, q.in.RateInterval)
 		}
 		sb.WriteRune(')') // closes sum(...
 		if isHisto && quantile != "" {
@@ -134,8 +135,12 @@ func (q *QueryBuilder) Build() Query {
 	}
 }
 
-func appendRate(sb *strings.Builder, metric string, filters filters.SingleQuery, interval string) {
-	sb.WriteString("rate(")
+func appendRateOrIncrease(sb *strings.Builder, isIncrease bool, metric string, filters filters.SingleQuery, interval string) {
+	if isIncrease {
+		sb.WriteString("increase(")
+	} else {
+		sb.WriteString("rate(")
+	}
 	appendFilteredMetric(sb, metric, filters)
 	sb.WriteRune('[')
 	sb.WriteString(interval)
@@ -158,14 +163,17 @@ func appendFilteredMetric(sb *strings.Builder, metric string, filters filters.Si
 	sb.WriteRune('}')
 }
 
+// GetLabelsAndFilter returns the label fields for grouping and an optional extra filter string.
+// For Prometheus, the "app" aggregate is a noop (it's only relevant for Loki stream selectors).
 func GetLabelsAndFilter(kl map[string][]string, aggregate, groups string) ([]string, string) {
 	if aggregate == "app" {
 		// ignore app: it's a noop aggregation needed for Loki, not relevant in promQL
 		return nil, ""
 	}
-	return loki.GetLabelsAndFilter(kl, aggregate, groups)
+	return queryparams.GetLabelsAndFilter(kl, aggregate, groups)
 }
 
+// QueryFilters builds a PromQL metric selector string with the given filters applied.
 func QueryFilters(metric string, filters filters.SingleQuery) string {
 	sb := strings.Builder{}
 	appendFilteredMetric(&sb, metric, filters)

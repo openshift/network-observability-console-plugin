@@ -3,7 +3,7 @@ import _ from 'lodash';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Record } from '../../api/ipfix';
-import { getFunctionMetricKey, getRateMetricKey, NetflowMetrics, Stats } from '../../api/loki';
+import { getFunctionMetricKey, getRateMetricKey, NetflowMetrics, Stats } from '../../api/query-response';
 import { Config } from '../../model/config';
 import { Filter, Filters, filtersEqual, hasIndexFields, hasNonIndexFields } from '../../model/filters';
 import { FlowScope, MetricType, RecordType, StatFunction } from '../../model/flow-query';
@@ -265,9 +265,14 @@ export const NetflowTrafficDrawer = React.forwardRef<NetflowTrafficDrawerHandle,
                 size={props.size}
                 onSelect={onRecordSelect}
                 columns={caps.selectedColumns}
-                setColumns={(v: Column[]) =>
-                  props.setColumns(v.concat(caps.availableColumns.filter(col => !col.isSelected)))
-                }
+                setColumns={(v: Column[]) => {
+                  const selectedIds = new Set(v.map(c => c.id));
+                  const selected = v.map(c => ({ ...c, isSelected: true }));
+                  const unselected = caps.availableColumns
+                    .filter(col => !selectedIds.has(col.id))
+                    .map(c => ({ ...c, isSelected: false }));
+                  props.setColumns(selected.concat(unselected));
+                }}
                 columnSizes={props.columnSizes}
                 setColumnSizes={props.setColumnSizes}
                 resetDefaultFilters={getResetDefaultFiltersProp()}
@@ -303,6 +308,7 @@ export const NetflowTrafficDrawer = React.forwardRef<NetflowTrafficDrawerHandle,
                   scopes={caps.availableScopes}
                   resetDefaultFilters={getResetDefaultFiltersProp()}
                   clearFilters={getClearFiltersProp()}
+                  isTLSTracking={caps.isTLSTracking}
                 />
               </>
             );

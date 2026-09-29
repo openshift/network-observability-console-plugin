@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { FlowScope, MetricType, StatFunction } from '../../model/flow-query';
 import { useNetflowContext } from '../../model/netflow-context';
 import { TopologyOptions } from '../../model/topology';
-import { exportToPng } from '../../utils/export';
+import { areChartsSizedForExport, exportToPng, waitForExportLayout } from '../../utils/export';
 import { useTheme } from '../../utils/theme-hook';
 import OverviewDisplayDropdown, { Size } from '../dropdowns/overview-display-dropdown';
 import TableDisplayDropdown from '../dropdowns/table-display-dropdown';
@@ -62,21 +62,32 @@ export const ViewOptionsToolbar = React.forwardRef<SearchHandle, ViewOptionsTool
   const { caps } = useNetflowContext();
 
   const onTopologyExport = React.useCallback(() => {
-    const topology_flex = document.getElementsByClassName('pf-topology-visualization-surface__svg')[0];
-    exportToPng('topology', topology_flex as HTMLElement, isDarkTheme);
+    const topology_svg = document.querySelector<SVGSVGElement>('.pf-topology-visualization-surface__svg');
+    exportToPng('topology', topology_svg ?? undefined, isDarkTheme);
   }, [isDarkTheme]);
 
   const onOverviewExport = React.useCallback(() => {
     const prevFocusState = props.overviewFocus;
-    props.setOverviewFocus(false);
-    setTimeout(() => {
-      const overview_flex = document.getElementById('overview-flex');
-      exportToPng('overview_page', overview_flex as HTMLElement, isDarkTheme, undefined, () =>
-        props.setOverviewFocus(prevFocusState)
-      );
-    }, 500);
+    const overviewRoot = document.getElementById('overview-flex');
+    const layoutRoot = document.getElementById('overview-graph-list') ?? overviewRoot;
+
+    const runExport = async () => {
+      try {
+        if (prevFocusState) {
+          props.setOverviewFocus(false);
+          await waitForExportLayout(layoutRoot, { requireResize: true });
+        } else if (!areChartsSizedForExport(layoutRoot ?? document.body)) {
+          await waitForExportLayout(layoutRoot);
+        }
+        await exportToPng('overview_page', overviewRoot ?? undefined, isDarkTheme);
+      } finally {
+        props.setOverviewFocus(prevFocusState);
+      }
+    };
+
+    void runExport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDarkTheme, props.setOverviewFocus]);
+  }, [isDarkTheme, props.overviewFocus, props.setOverviewFocus]);
 
   const viewOptionsContent = () => {
     const items: JSX.Element[] = [];
@@ -223,9 +234,7 @@ export const ViewOptionsToolbar = React.forwardRef<SearchHandle, ViewOptionsTool
             onClick={() => props.setViewOptionOverflowMenuOpen(!props.isViewOptionOverflowMenuOpen)}
             onBlur={() => props.setViewOptionOverflowMenuOpen(false)}
           >
-            <>
-              <EllipsisVIcon /> {t('More options')}
-            </>
+            {t('More options')}
           </MenuToggle>
         )}
       >
@@ -269,6 +278,7 @@ export const ViewOptionsToolbar = React.forwardRef<SearchHandle, ViewOptionsTool
               setTopologyOptions={props.setTopologyOptions}
               allowedTypes={caps.allowedMetricTypes}
               scopes={caps.availableScopes}
+              isTLSTracking={caps.isTLSTracking}
             />
           )}
         </OverflowMenuItem>

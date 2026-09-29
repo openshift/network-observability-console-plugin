@@ -19,7 +19,7 @@ describe('(OCP-70972) Netflow traffic pages on workloads', { tags: ['Network_Obs
 
     it('(OCP-70972, memodi), netflow traffic pages should appear on workloads', { tags: ["@smoke"] }, function () {
         pagesToVisit.forEach((page) => {
-            cy.clearLocalStorage()
+            cy.clearNetobservLocalStorage()
             cy.visitNetflowTrafficTab(page)
         })
     })

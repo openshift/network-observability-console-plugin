@@ -8,7 +8,13 @@
  */
 import _ from 'lodash';
 import { useCallback, useRef } from 'react';
-import { Link as RouterLink, useNavigate as useRouterNavigate, useParams as useRouterParams } from 'react-router';
+import {
+  Link as RouterLink,
+  useNavigate as useRouterNavigate,
+  useParams as useRouterParams,
+  useSearchParams as useRouterSearchParams
+} from 'react-router';
+import { ContextSingleton } from './context';
 
 export { RouterLink as Link };
 
@@ -44,12 +50,66 @@ export const useParams = <T extends Record<string, string | undefined> = Record<
   return useRouterParams() as T;
 };
 
-export const netflowTrafficPath = '/netflow-traffic';
-export const flowCollectorNewPath = '/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/~new';
-export const flowCollectorEditPath = '/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/cluster';
-export const flowCollectorStatusPath = '/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector/status';
+export const useSearchParams = useRouterSearchParams;
+
+export const netflowTrafficPath = () => {
+  if (ContextSingleton.isStandalone()) {
+    return '/console-netflow-traffic';
+  }
+  return '/netflow-traffic';
+};
+
+const flowCollectorBasePath = '/k8s/cluster/flows.netobserv.io~v1beta2~FlowCollector';
+
+export const flowCollectorPath = (action: 'new' | 'setup' | 'edit' | 'status') => {
+  if (ContextSingleton.isStandalone() && !ContextSingleton.isMock()) {
+    return undefined;
+  }
+  switch (action) {
+    case 'new':
+      return `${flowCollectorBasePath}/~new`;
+    case 'setup':
+      return `${flowCollectorBasePath}/setup`;
+    case 'edit':
+      return `${flowCollectorBasePath}/edit`;
+    case 'status':
+      return `${flowCollectorBasePath}/status`;
+  }
+};
+
+const flowCollectorPathSegment = (pathname: string = window.location.pathname): string | undefined => {
+  const prefix = `${flowCollectorBasePath}/`;
+  if (!pathname.startsWith(prefix)) {
+    return undefined;
+  }
+  return pathname.slice(prefix.length).split('/')[0] || undefined;
+};
+
+/** True on Console "Create" routes (`~new` form bypass and wizard `setup`). */
+export const isFlowCollectorCreatePath = (pathname: string = window.location.pathname): boolean => {
+  const segment = flowCollectorPathSegment(pathname);
+  return segment === '~new' || segment === 'setup';
+};
+
+/**
+ * Resolves the FlowCollector instance name from the URL on edit/yaml routes.
+ * Form routes use static segments (e.g. `/edit`, `/cluster/yaml`) rather than a `:name` param
+ * because `/cluster` is reserved for the status page.
+ */
+export const getFlowCollectorResourceName = (pathname: string = window.location.pathname): string | undefined => {
+  if (isFlowCollectorCreatePath(pathname)) {
+    return undefined;
+  }
+  const segment = flowCollectorPathSegment(pathname);
+  if (!segment) {
+    return undefined;
+  }
+  if (segment === 'edit' || segment === 'cluster') {
+    return 'cluster';
+  }
+  return segment;
+};
 export const flowMetricNewPath = '/k8s/cluster/flows.netobserv.io~v1alpha1~FlowMetric/~new';
-export const flowCollectorSliceNewPath = '/k8s/cluster/flows.netobserv.io~v1alpha1~FlowCollectorSlice/~new';
 
 // React-router query argument (not backend routes)
 export enum URLParam {
@@ -66,7 +126,15 @@ export enum URLParam {
   DataSource = 'dataSource',
   ShowDuplicates = 'showDup',
   MetricFunction = 'function',
-  MetricType = 'type'
+  MetricType = 'type',
+  View = 'view',
+  // Network Health filters (prefixed to avoid mixing with the Traffic params above,
+  // which have LogQL-specific encoding)
+  HealthSeverity = 'healthSeverity',
+  HealthStatus = 'healthStatus',
+  HealthMode = 'healthMode',
+  HealthNamespace = 'healthNamespace',
+  HealthName = 'healthName'
 }
 export type URLParams = { [k in URLParam]?: unknown };
 
@@ -123,6 +191,33 @@ export const setSomeURLParams = (params: Map<URLParam, string>, replace?: boolea
     window.history.replaceState({}, '', `${url.pathname}?${sp.toString()}${url.hash}`);
   } else {
     window.history.pushState({}, '', `${url.pathname}?${sp.toString()}${url.hash}`);
+  }
+};
+
+// Applies a batch of params in a single history entry: keys with a non-empty value are set,
+// keys with an empty value are removed. Skips the history write entirely when the resulting query
+// string already matches the current URL, which avoids polluting history with a duplicate entry
+// on mount and collapses a multi-param change into a single Back step.
+export const syncURLParams = (params: Map<URLParam, string>, replace?: boolean) => {
+  const current = new URLSearchParams(window.location.search);
+  const next = new URLSearchParams(window.location.search);
+  params.forEach((v, k) => {
+    if (v) {
+      next.set(k, v);
+    } else {
+      next.delete(k);
+    }
+  });
+  if (next.toString() === current.toString()) {
+    return;
+  }
+  const url = new URL(window.location.href);
+  const search = next.toString();
+  const target = `${url.pathname}${search ? `?${search}` : ''}${url.hash}`;
+  if (replace) {
+    window.history.replaceState({}, '', target);
+  } else {
+    window.history.pushState({}, '', target);
   }
 };
 

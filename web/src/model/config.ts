@@ -18,6 +18,11 @@ export type Feature =
   | 'tlsTracking';
 
 export type RecordingAnnotations = { [recordName: string]: { [key: string]: string } };
+export type HealthTemplate = {
+  name: string;
+  runbookURL: string;
+  isConfigured: boolean;
+};
 
 export type Config = {
   buildVersion: string;
@@ -37,11 +42,12 @@ export type Config = {
   features: Feature[];
   fields: FieldConfig[];
   dataSources: string[];
-  lokiMocks: boolean;
+  consoleMode: 'Standalone' | 'OpenShiftPlugin' | 'Mock';
   lokiLabels: string[];
   promLabels: string[];
   maxChunkAgeMs?: number;
   recordingAnnotations?: RecordingAnnotations;
+  healthTemplates: HealthTemplate[];
 };
 
 export const defaultConfig: Config = {
@@ -62,9 +68,10 @@ export const defaultConfig: Config = {
   features: [],
   fields: [],
   dataSources: ['loki', 'prom'],
-  lokiMocks: false,
+  consoleMode: 'Standalone',
   lokiLabels: [],
   promLabels: [],
   maxChunkAgeMs: undefined,
-  recordingAnnotations: {}
+  recordingAnnotations: {},
+  healthTemplates: []
 };

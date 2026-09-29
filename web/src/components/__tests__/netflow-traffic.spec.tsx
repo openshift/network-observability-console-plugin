@@ -2,7 +2,7 @@ import { useResolvedExtensions } from '@openshift-console/dynamic-plugin-sdk';
 import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { AlertsResult, SilencedAlert } from '../../api/alert';
-import { FlowMetricsResult, GenericMetricsResult } from '../../api/loki';
+import { FlowMetricsResult, GenericMetricsResult } from '../../api/query-response';
 import { getConfig, getFlowGenericMetrics, getFlowMetrics, getFlowRecords, getRole } from '../../api/routes';
 import { FlowQuery } from '../../model/flow-query';
 import { FullConfigResultSample, SimpleConfigResultSample } from '../__tests-data__/config';
@@ -92,10 +92,8 @@ describe('<NetflowTraffic />', () => {
       { ...defaultQuery, function: 'avg', aggregateBy: 'app', type: 'DnsLatencyMs' },
       { ...defaultQuery, function: 'p90', aggregateBy: 'app', type: 'DnsLatencyMs' },
       { ...defaultQuery, function: 'avg', type: 'TimeFlowRttNs' },
-      { ...defaultQuery, function: 'min', type: 'TimeFlowRttNs' },
       { ...defaultQuery, function: 'p90', type: 'TimeFlowRttNs' },
       { ...defaultQuery, function: 'avg', aggregateBy: 'app', type: 'TimeFlowRttNs' },
-      { ...defaultQuery, function: 'min', aggregateBy: 'app', type: 'TimeFlowRttNs' },
       { ...defaultQuery, function: 'p90', aggregateBy: 'app', type: 'TimeFlowRttNs' }
     ];
     const expectedGenericMetricsQueries: FlowQuery[] = [

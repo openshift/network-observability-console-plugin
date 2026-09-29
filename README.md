@@ -159,7 +159,7 @@ You can run the cypress tests either with the OpenShift Console + NetObserv as a
 
 1. Start the [standalone mode](#standalone-console) as documented above. You should have the console accessible and working on http://localhost:9001
 
-2. Edit [consts.js](./web/cypress/support/const.js) to set the URL to "http://localhost:9001".
+2. Edit [const.ts](./web/cypress/support/const.ts) to set the URL to "http://localhost:9001".
 
 3. Start cypress:
 
@@ -190,9 +190,17 @@ This console plugin comes with several panels allowing GUI-based configuration f
 
 When you update the operator CRDs, you may have to update some schemas here as well, which contain some rules that drive how forms are displayed. Especially:
 
-- [uiSchema.ts](./web/src/components/forms/config/uiSchema.ts) contains a display-oriented description of every CRD field, including whether or not they should be hidden, or if they have relationships with other fields.
-- [< CRD name >-wizard.tsx](./web/src/components/forms/flowCollector-wizard.tsx) contains specific fields to be displayed in wizards.
+- [flowCollectorUISchema.ts](./web/src/components/forms/flowCollector/uiSchema.ts) (and related `*UISchema.ts` files in each feature folder) contain a display-oriented description of every CRD field, including whether or not they should be hidden, or if they have relationships with other fields.
+- [<feature>/wizard.tsx](./web/src/components/forms/flowCollector/wizard.tsx) contains specific fields to be displayed in wizards.
 
 When a CRD field is added, consider whether you need to update these files.
 
-Additionally, [schema.ts](./web/moduleMapper/schemas.ts) contains the full CRD schema as JSON, used in tests and in standalone mode, and should also be kept up to date. Use [generate-schemas.sh](./scripts/generate-schemas.sh) to regenerate them (you need a running cluster with the CRDs installed).
+Additionally, [schemas.ts](./web/pluginToStandaloneMapper/schemas.ts) contains the full CRD schema as JSON, used in tests and in standalone mode, and should also be kept up to date. Use [generate-schemas.sh](./scripts/generate-schemas.sh) to regenerate them (you need a running cluster with the CRDs installed).
+
+Health-rule template defaults (names, modes, first-variant thresholds) are synced from the operator `DefaultHealthRules` into [variantDefaults.ts](./web/src/components/forms/healthRule/variantDefaults.ts). After changing defaults in the operator, regenerate with:
+
+```bash
+OPERATOR_PATH=../network-observability-operator ./scripts/generate-health-rule-defaults.sh
+```
+
+(`OPERATOR_PATH` defaults to `../network-observability-operator` relative to this repo.)

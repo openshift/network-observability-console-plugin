@@ -53,13 +53,33 @@ function escapeShellArg(arg: string): string {
 
 import * as c from './const';
 
+/**
+ * Clears only NetObserv plugin settings. Do not use cy.clearLocalStorage() —
+ * wiping all keys drops Console auth/session state and causes /netflow-traffic 404s
+ * and OAuth redirects in integration tests.
+ */
+Cypress.Commands.add('clearNetobservLocalStorage', () => {
+  cy.window().then(win => {
+    win.localStorage.removeItem('netobserv-plugin-settings');
+  });
+});
+
 Cypress.Commands.add('openNetflowTrafficPage', (clearCache = true) => {
   if (clearCache) {
-    //clear local storage to ensure to be in default view = overview
-    cy.clearLocalStorage();
+    // Reset plugin view prefs to defaults without clearing Console session
+    cy.clearNetobservLocalStorage();
   }
   cy.visit(c.url);
   cy.get("#netflow-traffic-nav-item-link").click();
+});
+
+Cypress.Commands.add('openNetworkHealthPage', (clearCache = true) => {
+  if (clearCache) {
+    // Reset plugin view prefs to defaults without clearing Console session
+    cy.clearNetobservLocalStorage();
+  }
+  cy.visit(c.url);
+  cy.get('#network-health-nav-item-link').click();
 });
 
 Cypress.Commands.add('showAdvancedOptions', () => {
@@ -283,7 +303,7 @@ Cypress.Commands.add("switchPerspective", (perspective: string) => {
 Cypress.Commands.add('adminCLI', (command: string, options?: Partial<Cypress.ExecOptions>) => {
   const kubeconfig = Cypress.env('KUBECONFIG_PATH');
   cy.log(`Run admin command: ${command}`);
-  cy.exec(`${command} --kubeconfig ${kubeconfig}`, options);
+  return cy.exec(`${command} --kubeconfig ${kubeconfig}`, options);
 });
 
 // to avoid influence from upstream login change
@@ -395,6 +415,7 @@ declare global {
   namespace Cypress {
     interface Chainable {
       openNetflowTrafficPage(clearCache?: boolean): Chainable<void>
+      openNetworkHealthPage(clearCache?: boolean): Chainable<void>
       showAdvancedOptions(): Chainable<void>
       showDisplayOptions(): Chainable<void>
       checkPanels(panels?: number): Chainable<void>
@@ -412,7 +433,8 @@ declare global {
       changeMetricType(name: string): Chainable<void>
       checkRecordField(field: string, name: string, values: string[]): Chainable<void>
       clickShowDuplicates(): Chainable<void>
-      adminCLI(command: string, options?: Partial<Cypress.ExecOptions>): Chainable<void>
+      adminCLI(command: string, options?: Partial<Cypress.ExecOptions>): Chainable<Cypress.Exec>
+      clearNetobservLocalStorage(): Chainable<void>
       uiLogin(provider: string, username: string, password: string): Chainable<void>
       uiLogout(): Chainable<void>
       cliLogin(username?: string, password?: string): Chainable<void>

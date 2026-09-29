@@ -17,7 +17,7 @@ import {
   Stats,
   Status,
   StreamResult
-} from './loki';
+} from './query-response';
 
 export const getFlowRecords = (params: FlowQuery): Promise<RecordsResult> => {
   return axios.get(ContextSingleton.getHost() + '/api/loki/flow/records', { params }).then(r => {
@@ -32,10 +32,43 @@ export const getFlowRecords = (params: FlowQuery): Promise<RecordsResult> => {
   });
 };
 
-export const getAlerts = (match: string): Promise<AlertsResult> => {
-  const matchKeyEnc = encodeURIComponent('match[]');
-  const matchValEnc = encodeURIComponent('{' + match + '}');
-  return axios.get(`/api/prometheus/api/v1/rules?type=alert&${matchKeyEnc}=${matchValEnc}`).then(r => {
+export const getAlerts = (match?: string): Promise<AlertsResult> => {
+  let url = '/api/prometheus/api/v1/rules?type=alert';
+  if (match !== undefined) {
+    url += `&${encodeURIComponent('match[]')}=${encodeURIComponent('{' + match + '}')}`;
+  }
+  return axios.get(url).then(r => {
+    if (r.status >= 400) {
+      throw new Error(`${r.statusText} [code=${r.status}]`);
+    }
+    return r.data;
+  });
+};
+
+// Narrows the rules fetch to one or more Prometheus rule groups. OVN platform alerts carry no
+// filterable label (only the universal prometheus/severity), and the rules endpoint does not
+// match on __name__, so filtering by rule group is the only way to avoid pulling every rule.
+// Note: OpenShift's thanos-querier AND-s multiple match[] selectors within one request, but
+// repeated rule_group[] params are OR-ed, so several groups can be requested at once. This must
+// still stay a separate request rather than being combined with a match[] fetch.
+export const getAlertsByRuleGroup = (ruleGroups: string | readonly string[]): Promise<AlertsResult> => {
+  const groups = Array.isArray(ruleGroups) ? ruleGroups : [ruleGroups];
+  const groupKeyEnc = encodeURIComponent('rule_group[]');
+  const query = groups.map(g => `${groupKeyEnc}=${encodeURIComponent(g)}`).join('&');
+  const url = `/api/prometheus/api/v1/rules?type=alert&${query}`;
+  return axios.get(url).then(r => {
+    if (r.status >= 400) {
+      throw new Error(`${r.statusText} [code=${r.status}]`);
+    }
+    return r.data;
+  });
+};
+
+// Alertmanager filters match silence matcher definitions, not alert labels. Broad silences
+// (e.g. by alertname only) can still suppress OVN alerts whose prometheus label lives on
+// PrometheusRule metadata rather than on the alert itself, so we fetch all active silences.
+export const getAllSilencedAlerts = (): Promise<SilencedAlert[]> => {
+  return axios.get('/api/alertmanager/api/v2/silences').then(r => {
     if (r.status >= 400) {
       throw new Error(`${r.statusText} [code=${r.status}]`);
     }
@@ -157,6 +190,20 @@ export const getK8SUDNIds = (): Promise<string[]> => {
   });
 };
 
+// no-explicit-any disabled: returns unstructured resource from k8s client (TODO: provide a basic typical structure?)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const getFlowCollector = (): Promise<any> => {
+  return axios
+    .get(ContextSingleton.getHost() + '/api/resources/flowcollector', {})
+    .then(r => r.data)
+    .catch(err => {
+      if (err.response?.data?.message) {
+        throw new Error(`${err}: ${err.response.data.message}`);
+      }
+      throw err;
+    });
+};
+
 export const getFlowMetrics = (params: FlowQuery, range: number | TimeRange): Promise<FlowMetricsResult> => {
   return getFlowMetricsGeneric(params, res => {
     return parseTopologyMetrics(
@@ -231,8 +278,10 @@ export const getConfig = (): Promise<Config> => {
       dataSources: r.data.dataSources || defaultConfig.dataSources,
       promLabels: r.data.promLabels || defaultConfig.promLabels,
       lokiLabels: r.data.lokiLabels || defaultConfig.lokiLabels,
+      consoleMode: r.data.consoleMode || defaultConfig.consoleMode,
       maxChunkAgeMs: r.data.maxChunkAgeMs,
-      recordingAnnotations: r.data.recordingAnnotations || defaultConfig.recordingAnnotations
+      recordingAnnotations: r.data.recordingAnnotations || defaultConfig.recordingAnnotations,
+      healthTemplates: r.data.healthTemplates || defaultConfig.healthTemplates
     };
   });
 };

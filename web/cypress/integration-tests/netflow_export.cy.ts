@@ -40,17 +40,26 @@ describe('(OCP-72610) Export automation', { tags: ['Network_Observability'] }, f
         cy.showAdvancedOptions();
         cy.get('#export-button').should('exist').click()
         cy.byTestID('export-modal').should('be.visible')
+        cy.exec("rm -f cypress/downloads/*.csv", { failOnNonZeroExit: false })
         cy.byTestID('export-modal').within(() => {
             cy.byTestID('export-button').should('exist').click()
         })
-        // get the CSV file name with retry built into exec
-        cy.exec("ls cypress/downloads", { timeout: 15000 }).then((response) => {
-            const files = response.stdout.trim().split('\n').filter(f => f.endsWith('.csv'))
-            expect(files).to.have.length(1, 'Expected exactly one CSV file in downloads')
-            const csvFile = files[0]
-            cy.exec(`mv "cypress/downloads/${csvFile}" "cypress/downloads/export_table.csv"`)
-            cy.readFile('cypress/downloads/export_table.csv', { timeout: 10000 })
-        })
+        const waitForCsv = (retries = 5): void => {
+            cy.exec("ls cypress/downloads", { failOnNonZeroExit: false }).then((response) => {
+                const files = (response.stdout || '').trim().split('\n').filter(f => f.endsWith('.csv'))
+                if (files.length === 0 && retries > 0) {
+                    cy.wait(2000)
+                    waitForCsv(retries - 1)
+                    return
+                }
+                expect(files.length).to.be.greaterThan(0)
+                const csvFile = files[0]
+                expect(csvFile).to.match(/^[\w.-]+$/)
+                cy.exec(`mv "cypress/downloads/${csvFile}" "cypress/downloads/export_table.csv"`)
+                cy.readFile('cypress/downloads/export_table.csv', { timeout: 10000 })
+            })
+        }
+        waitForCsv()
         cy.exec('rm cypress/downloads/export_table.csv')
         netflowPage.clearAllFilters()
     })

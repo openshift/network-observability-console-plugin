@@ -12,6 +12,13 @@ export type MetricType = 'Flows' | 'DnsFlows' | 'TlsFlows' | Field;
 // such as 'app', 'cluster', 'zone', 'host', 'namespace', 'owner', 'resource'...
 export type FlowScope = string;
 export type AggregateBy = FlowScope | Field;
+
+/** Suffix for aggregateBy keys that mirror a topology scope plus TLSVersion (see backend GetAggregateKeyLabels). */
+export const topologyTlsVersionAggregateSuffix = '__TLSVersion';
+
+export const aggregateByWithTlsVersion = (scope: FlowScope): AggregateBy =>
+  `${scope}${topologyTlsVersionAggregateSuffix}` as AggregateBy;
+
 export type NodeType = FlowScope | 'unknown';
 // groups are configurable and can be any string
 // such as 'clusters', 'clusters+zones', 'clusters+hosts', 'clusters+namespaces', 'clusters+owners',
@@ -67,4 +74,17 @@ export const filterByHashId = (hashId: string): string => {
 
 export const isTimeMetric = (metricType: MetricType | undefined) => {
   return ['DnsLatencyMs', 'TimeFlowRttNs'].includes(metricType || '');
+};
+
+/** Volume metrics used for topology rate edges; TLS lock / cleartext hints apply only here (not DNS latency or RTT). */
+export const showTLSHints = (metricType: MetricType | undefined): boolean => {
+  if (!metricType) {
+    return false;
+  }
+  return (
+    metricType === 'Bytes' ||
+    metricType === 'Packets' ||
+    metricType === 'PktDropBytes' ||
+    metricType === 'PktDropPackets'
+  );
 };

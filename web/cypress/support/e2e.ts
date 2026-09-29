@@ -17,6 +17,7 @@ import './commands'
 // These are known bugs in OCP 4.22 EC builds that don't affect NetObserv functionality
 Cypress.on('uncaught:exception', (err) => {
     const errorMsg = err.message
+    const stack = err.stack || ''
 
     // Ignore specific networking-console-plugin errors
     if (errorMsg.includes('networking-console-plugin') || errorMsg.includes('networkingFlags')) {
@@ -25,6 +26,17 @@ Cypress.on('uncaught:exception', (err) => {
 
     // Ignore monitoring-plugin errors
     if (errorMsg.includes('monitoring-plugin') || errorMsg.includes('MonitoringReducer')) {
+        return false
+    }
+
+    // Transient Console shell auth noise during navigation / dynamic plugin load.
+    // Only suppress when the stack points at Console static bundles — not NetObserv code.
+    if (
+        (errorMsg === 'Unauthorized' || errorMsg.includes('Unauthorized')) &&
+        (/\/static\/main-bundle/.test(stack) ||
+            /main-bundle[^/\s]*\.min\.js/.test(stack) ||
+            /loadDynamicPlugin|getPluginEntry|pluginStore/i.test(stack))
+    ) {
         return false
     }
 

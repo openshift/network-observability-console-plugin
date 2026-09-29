@@ -78,7 +78,7 @@ module.exports = {
       /dynamic-plugin-sdk/,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       function (resource) {
-        resource.request = path.resolve(__dirname, "moduleMapper/dummy");
+        resource.request = path.resolve(__dirname, "pluginToStandaloneMapper/mapper");
       }
     ),
     new MiniCssExtractPlugin(
@@ -89,8 +89,8 @@ module.exports = {
     ),
     new CopyWebpackPlugin({
       patterns: [
-        { from: path.resolve(__dirname, 'locales'), to: 'locales' },
-        { from: path.resolve(__dirname, 'assets'), to: 'assets' },
+        { from: 'locales', to: 'locales', context: __dirname },
+        { from: 'assets', to: 'assets', context: __dirname },
       ],
     }),
     new HtmlWebpackPlugin({

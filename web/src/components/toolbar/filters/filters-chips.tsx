@@ -411,7 +411,7 @@ export const FiltersChips: React.FC<FiltersChipsProps> = ({
           .filter(gp => gp.filters.length)
           .map((gp, index) => {
             return (
-              <div key={gp.id} className="flex-block no-wrap">
+              <div key={gp.id} className="flex-block filters-group">
                 {getAndOr(filters.match, index, true)}
                 <div className={`custom-chip-box ${gp.id !== 'common' ? 'custom-chip-peer' : ''}`}>
                   {hasSrcOrDstFilters(gp.filters) && (
@@ -437,7 +437,7 @@ export const FiltersChips: React.FC<FiltersChipsProps> = ({
           <Button
             id="edit-filters-button"
             data-test="edit-filters-button"
-            onClick={() => navigate(getPathWithParams(netflowTrafficPath))}
+            onClick={() => navigate(getPathWithParams(netflowTrafficPath()))}
           >
             {t('Edit filters')}
           </Button>

@@ -14,9 +14,27 @@ import { FilterIcon, TimesIcon } from '@patternfly/react-icons';
 import { BaseEdge, BaseNode } from '@patternfly/react-topology';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Filter, FilterDefinition, Filters } from '../../../model/filters';
-import { GraphElementPeer, isElementFiltered, NodeData, toggleElementFilter } from '../../../model/topology';
+import {
+  createFilterValue,
+  doesIncludeFilter,
+  Filter,
+  FilterCompare,
+  FilterDefinition,
+  Filters,
+  type FilterId
+} from '../../../model/filters';
+import {
+  EdgeTlsPanelData,
+  GraphElementPeer,
+  isElementFiltered,
+  NodeData,
+  toggleElementFilter,
+  toggleQuickFilterValue
+} from '../../../model/topology';
+import { findFilter } from '../../../utils/filter-definitions';
 import { createPeer } from '../../../utils/metrics';
+import { tlsLockSeverityForGroupLabel } from '../../../utils/tls-lock-severity';
+import { TlsSeverityLockIcon, TlsVersionLockIcon } from '../../icons/tls-lock-icons';
 import { ElementFields } from './element-fields';
 
 export interface ElementPanelContentProps {
@@ -121,6 +139,100 @@ export const ElementPanelContent: React.FC<ElementPanelContentProps> = ({
     [t]
   );
 
+  const edgeTlsInfo = React.useCallback(
+    (d: EdgeTlsPanelData | undefined) => {
+      const hasTlsData = (panel?: EdgeTlsPanelData) =>
+        Boolean(panel?.tagTlsSecure) ||
+        Boolean(panel?.tlsVersionLabels?.length) ||
+        Boolean(panel?.tlsGroupLabels?.length);
+      const panel = hasTlsData(d) ? d : undefined;
+      if (!panel || !hasTlsData(panel)) {
+        return <></>;
+      }
+      const { tagTlsSecure, tlsVersionLabels, tlsGroupLabels } = panel;
+      const versionLabels = tlsVersionLabels ?? [];
+
+      const renderTlsQuickFilter = (filterId: FilterId, value: string, buttonId: string) => {
+        const def = findFilter(filterDefinitions, filterId);
+        if (!def) {
+          return null;
+        }
+        const filterKey = { def, compare: FilterCompare.equal };
+        const filterValue = createFilterValue(def, value);
+        const filterValues = [filterValue];
+        const isFiltered = doesIncludeFilter(filters.list, filterKey, filterValues);
+        return (
+          <Button
+            id={buttonId}
+            data-test={`quick-filter-${filterId}-${value}`}
+            variant="plain"
+            className="overflow-button"
+            icon={isFiltered ? <TimesIcon /> : <FilterIcon />}
+            aria-label={
+              isFiltered ? t('Clear filter for {{value}}', { value }) : t('Apply filter for {{value}}', { value })
+            }
+            onClick={() => toggleQuickFilterValue(def, value, isFiltered, filters.list, setFilters)}
+          />
+        );
+      };
+
+      return (
+        <Content id="edge-tls-info" className="record-field-container">
+          <Content component={ContentVariants.h4}>{t('TLS')}</Content>
+          {tagTlsSecure ? (
+            <Flex>
+              <FlexItem flex={{ default: 'flex_1' }}>
+                <Content component={ContentVariants.p}>
+                  {t('TLS-encrypted traffic was observed on this link for the selected scope and time range.')}
+                </Content>
+              </FlexItem>
+            </Flex>
+          ) : null}
+          {versionLabels.length > 0 ? (
+            <>
+              <Content component={ContentVariants.h4}>{t('TLS versions')}</Content>
+              <Flex direction={{ default: 'column' }} gap={{ default: 'gapSm' }}>
+                {versionLabels.map((label, i) => {
+                  const versionFilterBtn = renderTlsQuickFilter('tls_version', label, `edge-tls-version-filter-${i}`);
+                  return (
+                    <Flex key={`${label}-${i}`} alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                      <TlsVersionLockIcon versionLabel={label} />
+                      <FlexItem flex={{ default: 'flex_1' }}>
+                        <Content component={ContentVariants.p}>{label}</Content>
+                      </FlexItem>
+                      {versionFilterBtn ? <FlexItem>{versionFilterBtn}</FlexItem> : null}
+                    </Flex>
+                  );
+                })}
+              </Flex>
+            </>
+          ) : null}
+          {tlsGroupLabels && tlsGroupLabels.length > 0 ? (
+            <>
+              <Content component={ContentVariants.h4}>{t('TLS groups')}</Content>
+              <Flex direction={{ default: 'column' }} gap={{ default: 'gapSm' }}>
+                {tlsGroupLabels.map((label, i) => {
+                  const groupFilterBtn = renderTlsQuickFilter('tls_group', label, `edge-tls-group-filter-${i}`);
+                  const groupSeverity = tlsLockSeverityForGroupLabel(label, versionLabels);
+                  return (
+                    <Flex key={`${label}-${i}`} alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                      <TlsSeverityLockIcon severity={groupSeverity} />
+                      <FlexItem flex={{ default: 'flex_1' }}>
+                        <Content component={ContentVariants.p}>{label}</Content>
+                      </FlexItem>
+                      {groupFilterBtn ? <FlexItem>{groupFilterBtn}</FlexItem> : null}
+                    </Flex>
+                  );
+                })}
+              </Flex>
+            </>
+          ) : null}
+        </Content>
+      );
+    },
+    [filterDefinitions, filters, setFilters, t]
+  );
+
   if (element instanceof BaseNode && data) {
     return (
       <>
@@ -141,6 +253,7 @@ export const ElementPanelContent: React.FC<ElementPanelContentProps> = ({
     // Edge A to B (prefering neutral naming here as there is no assumption about what is source, what is destination
     const aData: NodeData = element.getSource().getData();
     const bData: NodeData = element.getTarget().getData();
+    const edgeData = element.getData();
     const combinedData = Object.assign({}, aData, bData);
     return (
       <>
@@ -189,6 +302,7 @@ export const ElementPanelContent: React.FC<ElementPanelContentProps> = ({
             </AccordionItem>
           </div>
         </Accordion>
+        {edgeTlsInfo(edgeData)}
       </>
     );
   }

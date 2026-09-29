@@ -10,7 +10,7 @@ import {
 import { SearchIcon } from '@patternfly/react-icons';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Status } from '../../api/loki';
+import { Status } from '../../api/query-response';
 import { getStatus } from '../../api/routes';
 import { Config } from '../../model/config';
 import { ContextSingleton } from '../../utils/context';
@@ -82,9 +82,11 @@ export const Empty: React.FC<EmptyProps> = ({ showDetails, resetDefaultFilters, 
           )}
           {statusError !== undefined && (
             <Content className="netobserv-error-message" component={ContentVariants.p}>
-              {t('Check for errors in health dashboard. Status endpoint is returning: {{statusError}}', {
-                statusError
-              })}
+              {ContextSingleton.isStandalone()
+                ? t('Status endpoint is returning: {{statusError}}', { statusError })
+                : t('Check for errors in health dashboard. Status endpoint is returning: {{statusError}}', {
+                    statusError
+                  })}
             </Content>
           )}
           <Content className="empty-text-content">

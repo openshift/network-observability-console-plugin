@@ -23,7 +23,7 @@ button.pf-v6-c-button.pf-m-link.pf-m-inline:empty {
   display: none;
 }
 
-/* align toolbar content top */
+/* align toolbar content top (chips / search rows) */
 .flex-start {
   align-self: flex-start;
 }
@@ -44,6 +44,60 @@ div#filter-toolbar-search-filters {
   padding: 0;
   padding-top: 1em;
   padding-bottom: 1em;
+}
+
+/*
+ * Pin Time range / Refresh to the top-right when the left controls wrap.
+ * Grid is on PF's content-section (children live there, not on __content).
+ */
+div#filter-toolbar-search-filters.netobserv-controls-with-trailing > .pf-v6-c-toolbar__content-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: var(--pf-t--global--spacer--md, 1rem);
+  row-gap: var(--pf-t--global--spacer--sm, 0.5rem);
+}
+
+.netobserv-toolbar-leading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--pf-t--global--spacer--md, 1rem);
+  row-gap: var(--pf-t--global--spacer--sm, 0.5rem);
+  min-width: 0;
+}
+
+.netobserv-toolbar-trailing {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-self: end;
+  flex-shrink: 0;
+}
+
+/* Keep Query options / Hide filters / Expand on one baseline */
+.netobserv-toolbar-leading > .pf-v6-c-toolbar__item {
+  align-self: center;
+  display: flex;
+  align-items: center;
+}
+
+div#filter-toolbar-search-filters #query-options-dropdown-container,
+div#filter-toolbar-search-filters #show-filters-button,
+div#filter-toolbar-search-filters #fullscreen-button,
+div#filter-toolbar-search-filters .overflow-button {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+div#filter-toolbar-search-filters #query-options-dropdown-container .pf-v6-c-button,
+div#filter-toolbar-search-filters #show-filters-button,
+div#filter-toolbar-search-filters #fullscreen-button,
+div#filter-toolbar-search-filters .overflow-button {
+  min-height: var(--pf-t--global--spacer--2xl, 2.25rem);
+  padding-block: 0;
+  line-height: var(--pf-t--global--font--line-height--body, 1.5);
 }
 
 .pf-v6-c-toolbar__item.pf-m-align-right {

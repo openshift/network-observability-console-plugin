@@ -14,12 +14,13 @@ import {
 import { configure } from 'mobx';
 import React from 'react';
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from 'react-router';
-import FlowCollectorForm from '../components/forms/flowCollector';
-import FlowCollectorStatus from '../components/forms/flowCollector-status';
-import FlowCollectorWizard from '../components/forms/flowCollector-wizard';
-import FlowCollectorSliceForm from '../components/forms/flowCollectorSlice';
-import FlowMetricForm from '../components/forms/flowMetric';
-import FlowMetricWizard from '../components/forms/flowMetric-wizard';
+import FlowCollectorForm from '../components/forms/flowCollector/form';
+import FlowCollectorStatus from '../components/forms/flowCollector/status';
+import FlowCollectorWizard from '../components/forms/flowCollector/wizard';
+import FlowCollectorSliceForm from '../components/forms/flowCollectorSlice/form';
+import FlowMetricForm from '../components/forms/flowMetric/form';
+import FlowMetricWizard from '../components/forms/flowMetric/wizard';
+import HealthRuleWizard from '../components/forms/healthRule/wizard';
 import NetworkHealth from '../components/health/network-health';
 import NetflowTrafficDevTab from '../components/netflow-traffic-dev-tab';
 import NetflowTrafficParent from '../components/netflow-traffic-parent';
@@ -86,6 +87,11 @@ const allPages = [
     content: <NetworkHealth />
   },
   {
+    id: 'health-rule-wizard',
+    name: 'Health Rule wizard',
+    content: <HealthRuleWizard />
+  },
+  {
     id: 'flowCollector-wizard',
     name: 'FlowCollector wizard',
     content: <FlowCollectorWizard name="cluster" />
@@ -122,6 +128,9 @@ export const App: React.FunctionComponent<{ endUser?: boolean }> = ({ endUser })
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [theme, setTheme] = React.useState<StandaloneTheme>('light');
   ContextSingleton.setStandalone();
+  if (!endUser) {
+    ContextSingleton.setMock();
+  }
   const pages = endUser ? endUserPages : allPages;
 
   React.useEffect(() => {

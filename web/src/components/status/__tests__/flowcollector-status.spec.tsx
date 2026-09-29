@@ -1,34 +1,47 @@
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 import { render } from '@testing-library/react';
 import * as React from 'react';
-import { getFlowCollectorOverallStatus } from '../../forms/utils';
-import { FlowCollectorStatusIcon } from '../flowcollector-status-icon';
+import { getFlowCollectorOverallStatus, isK8sNotFoundError } from '../../forms/utils';
 import { FlowCollectorStatusIndicator } from '../flowcollector-status-indicator';
 
 describe('getFlowCollectorOverallStatus', () => {
   it('should return loading when CR is undefined', () => {
-    expect(getFlowCollectorOverallStatus(undefined, null)).toBe('loading');
+    expect(getFlowCollectorOverallStatus(undefined, null)).toEqual({ status: 'loading' });
   });
 
   it('should return error on load error', () => {
-    expect(getFlowCollectorOverallStatus(undefined, 'some error')).toBe('error');
+    expect(getFlowCollectorOverallStatus(undefined, 'some error')).toEqual({ status: 'error', message: 'some error' });
+  });
+
+  it('should ignore not-found load errors', () => {
+    expect(getFlowCollectorOverallStatus(undefined, 'flowcollectors.flows.netobserv.io "cluster" not found')).toEqual({
+      status: 'loading'
+    });
   });
 
   it('should return onHold when execution mode is OnHold', () => {
     const cr = { spec: { execution: { mode: 'OnHold' } } };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('onHold');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'onHold' });
+  });
+
+  it('should return deleting when deletionTimestamp is set', () => {
+    const cr = {
+      metadata: { deletionTimestamp: '2026-07-29T10:00:00Z' },
+      status: { conditions: [{ type: 'Ready', status: 'True', reason: 'Ready' }] }
+    };
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'deleting' });
   });
 
   it('should return pending when no conditions', () => {
     const cr = { spec: {} };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('pending');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'pending' });
   });
 
   it('should return ready when Ready condition is True', () => {
     const cr = {
       status: { conditions: [{ type: 'Ready', status: 'True', reason: 'Ready' }] }
     };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('ready');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'ready' });
   });
 
   it('should return degraded when Ready is True with reason Ready,Degraded', () => {
@@ -37,14 +50,14 @@ describe('getFlowCollectorOverallStatus', () => {
         conditions: [{ type: 'Ready', status: 'True', reason: 'Ready,Degraded' }]
       }
     };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('degraded');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'degraded' });
   });
 
   it('should return pending when Ready condition is missing', () => {
     const cr = {
       status: { conditions: [{ type: 'AgentReady', status: 'True', reason: 'Ready' }] }
     };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('pending');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'pending' });
   });
 
   it('should return pending when Ready is False with reason Pending', () => {
@@ -56,7 +69,7 @@ describe('getFlowCollectorOverallStatus', () => {
         ]
       }
     };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('pending');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'pending' });
   });
 
   it('should return error when Ready is False with non-Pending reason', () => {
@@ -64,11 +77,11 @@ describe('getFlowCollectorOverallStatus', () => {
       status: {
         conditions: [
           { type: 'Ready', status: 'False', reason: 'Failed' },
-          { type: 'PluginReady', status: 'False', reason: 'CrashLoopBackOff' }
+          { type: 'PluginNotReady', status: 'True', reason: 'CrashLoopBackOff', message: 'Plugin fails to start' }
         ]
       }
     };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('error');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'error', message: 'Plugin fails to start' });
   });
 
   it('should return ready when Ready is True regardless of other conditions', () => {
@@ -81,39 +94,24 @@ describe('getFlowCollectorOverallStatus', () => {
         ]
       }
     };
-    expect(getFlowCollectorOverallStatus(cr, null)).toBe('ready');
+    expect(getFlowCollectorOverallStatus(cr, null)).toEqual({ status: 'ready' });
   });
 });
 
-describe('<FlowCollectorStatusIcon />', () => {
-  it('should render spinner for loading', () => {
-    const { container } = render(<FlowCollectorStatusIcon status="loading" />);
-    expect(container.querySelector('[role="progressbar"]')).toBeTruthy();
+describe('isK8sNotFoundError', () => {
+  it('should detect not-found messages', () => {
+    expect(isK8sNotFoundError('flowcollectors.flows.netobserv.io "cluster" not found')).toBe(true);
+    expect(isK8sNotFoundError(new Error('resource not found'))).toBe(true);
+    expect(isK8sNotFoundError(null)).toBe(false);
+    expect(isK8sNotFoundError('permission denied')).toBe(false);
   });
 
-  it('should render icon for ready', () => {
-    const { container } = render(<FlowCollectorStatusIcon status="ready" />);
-    expect(container.querySelector('svg')).toBeTruthy();
-  });
-
-  it('should render icon for degraded', () => {
-    const { container } = render(<FlowCollectorStatusIcon status="degraded" />);
-    expect(container.querySelector('svg')).toBeTruthy();
-  });
-
-  it('should render icon for pending', () => {
-    const { container } = render(<FlowCollectorStatusIcon status="pending" />);
-    expect(container.querySelector('svg')).toBeTruthy();
-  });
-
-  it('should render icon for error', () => {
-    const { container } = render(<FlowCollectorStatusIcon status="error" />);
-    expect(container.querySelector('svg')).toBeTruthy();
-  });
-
-  it('should render icon for onHold', () => {
-    const { container } = render(<FlowCollectorStatusIcon status="onHold" />);
-    expect(container.querySelector('svg')).toBeTruthy();
+  it('should detect Console/K8s rejection objects', () => {
+    expect(isK8sNotFoundError({ json: { code: 404, reason: 'NotFound', message: 'not found' } })).toBe(true);
+    expect(isK8sNotFoundError({ code: 404, message: 'Not Found' })).toBe(true);
+    expect(isK8sNotFoundError({ response: { status: 404 } })).toBe(true);
+    expect(isK8sNotFoundError({ json: { reason: 'NotFound' } })).toBe(true);
+    expect(isK8sNotFoundError({ json: { code: 403, reason: 'Forbidden', message: 'forbidden' } })).toBe(false);
   });
 });
 
@@ -152,5 +150,37 @@ describe('<FlowCollectorStatusIndicator />', () => {
     useK8sWatchResourceMock.mockReturnValue([null, false, 'load error']);
     const { container } = render(<FlowCollectorStatusIndicator />);
     expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('should render icon for degraded', () => {
+    useK8sWatchResourceMock.mockReturnValue([
+      { status: { conditions: [{ type: 'Ready', status: 'True', reason: 'Ready,Degraded' }] } },
+      true,
+      null
+    ]);
+    const { container } = render(<FlowCollectorStatusIndicator />);
+    expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('should render icon for pending', () => {
+    useK8sWatchResourceMock.mockReturnValue([
+      { status: { conditions: [{ type: 'Ready', status: 'False', reason: 'Pending' }] } },
+      true,
+      null
+    ]);
+    const { container } = render(<FlowCollectorStatusIndicator />);
+    expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('should render icon for onHold', () => {
+    useK8sWatchResourceMock.mockReturnValue([{ spec: { execution: { mode: 'OnHold' } } }, true, null]);
+    const { container } = render(<FlowCollectorStatusIndicator />);
+    expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it('should render spinner when CR is deleting', () => {
+    useK8sWatchResourceMock.mockReturnValue([{ metadata: { deletionTimestamp: '2026-07-29T10:00:00Z' } }, true, null]);
+    const { container } = render(<FlowCollectorStatusIndicator />);
+    expect(container.querySelector('[role="progressbar"]')).toBeTruthy();
   });
 });

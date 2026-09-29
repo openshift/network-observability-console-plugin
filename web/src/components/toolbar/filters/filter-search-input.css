@@ -1,5 +1,22 @@
-#filter-search-input, #filter-popper {
-  min-width: 500px !important;
+#filter-search-input-container {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+#filter-search-input,
+#filter-popper {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Prefer a comfortable default width when space allows */
+@media (min-width: 48rem) {
+  #filter-search-input-container {
+    min-width: min(500px, 100%);
+  }
 }
 
 .filters-actions {
@@ -11,4 +28,15 @@
 .filter-text-ellipsis {
   text-overflow: ellipsis;
   overflow: hidden;
+}
+
+/* Let the search field claim remaining toolbar space and shrink on narrow panes */
+.filter-search-toolbar-item {
+  flex: 1 1 16rem;
+  min-width: min(100%, 12rem);
+  max-width: 100%;
+}
+
+#filter-toolbar-search-filters {
+  flex-wrap: wrap;
 }

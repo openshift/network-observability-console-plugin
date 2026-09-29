@@ -3,7 +3,7 @@ import { BaseEdge, BaseNode, NodeModel } from '@patternfly/react-topology';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import * as React from 'react';
 
-import { TopologyMetrics } from '../../../../api/loki';
+import { TopologyMetrics } from '../../../../api/query-response';
 import { Filters } from '../../../../model/filters';
 import { FlowScope, MetricType } from '../../../../model/flow-query';
 import { NodeData } from '../../../../model/topology';
@@ -82,6 +82,52 @@ describe('<ElementPanel />', () => {
     });
     expect(container.querySelector('#source-content')?.textContent).toContain('10.131.0.18');
     expect(container.querySelector('#destination-content')?.textContent).toContain('172.30.0.10');
+  });
+
+  it('should show TLS block on edge when tagTlsSecure is set', async () => {
+    const edge = getEdge();
+    edge.setData({ tagTlsSecure: true });
+    const { container } = render(<ElementPanelContent {...mocks} element={edge} />);
+    await waitFor(() => {
+      expect(container.querySelector('#edge-tls-info')).toBeTruthy();
+    });
+    expect(container.querySelector('#edge-tls-info')?.textContent).toContain('TLS-encrypted traffic was observed');
+  });
+
+  it('should list TLS versions on edge when tlsVersionLabels are set', async () => {
+    const edge = getEdge();
+    edge.setData({ tagTlsSecure: true, tlsVersionLabels: ['TLS 1.3', 'TLS 1.2'] });
+    const { container } = render(<ElementPanelContent {...mocks} element={edge} />);
+    await waitFor(() => {
+      expect(container.querySelector('#edge-tls-info')).toBeTruthy();
+    });
+    expect(container.querySelector('#edge-tls-info')?.textContent).toContain('TLS 1.3');
+    expect(container.querySelector('#edge-tls-info')?.textContent).toContain('TLS 1.2');
+  });
+
+  it('should list TLS groups on edge when tlsGroupLabels are set', async () => {
+    const edge = getEdge();
+    edge.setData({
+      tagTlsSecure: true,
+      tlsVersionLabels: ['TLS 1.3'],
+      tlsGroupLabels: ['X25519MLKEM768', 'X25519']
+    });
+    const { container } = render(<ElementPanelContent {...mocks} element={edge} />);
+    await waitFor(() => {
+      expect(container.querySelector('#edge-tls-info')).toBeTruthy();
+    });
+    expect(container.querySelector('#edge-tls-info')?.textContent).toContain('X25519MLKEM768');
+    expect(container.querySelector('#edge-tls-info')?.textContent).toContain('X25519');
+  });
+
+  it('should show TLS block on edge when only tlsGroupLabels are set', async () => {
+    const edge = getEdge();
+    edge.setData({ tlsGroupLabels: ['X25519'] });
+    const { container } = render(<ElementPanelContent {...mocks} element={edge} />);
+    await waitFor(() => {
+      expect(container.querySelector('#edge-tls-info')).toBeTruthy();
+    });
+    expect(container.querySelector('#edge-tls-info')?.textContent).toContain('X25519');
   });
 
   it('should render node metrics', async () => {

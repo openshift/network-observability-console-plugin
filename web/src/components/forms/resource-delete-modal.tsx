@@ -8,12 +8,13 @@ import { SupportedKind } from './resource-watcher';
 export type ResourceDeleteModalProps = {
   kind: SupportedKind;
   data: K8sResourceKind;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
   onCancel: () => void;
 };
 
 export const ResourceDeleteModal: FC<ResourceDeleteModalProps> = ({ kind, data, onDelete, onCancel }) => {
   const { t } = useTranslation('plugin__netobserv-plugin');
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   let additionalInfo = '' as string | JSX.Element;
   switch (kind) {
@@ -33,13 +34,22 @@ export const ResourceDeleteModal: FC<ResourceDeleteModalProps> = ({ kind, data, 
       break;
   }
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete();
+    } catch {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Modal
       id="delete-modal"
       title={t('Delete {{kind}} {{name}}?', { kind: kind, name: data.metadata?.name })}
       isOpen={true}
       scrollable={false}
-      onClose={onCancel}
+      onClose={isDeleting ? undefined : onCancel}
       footer={
         <div className="footer">
           <Button
@@ -47,6 +57,7 @@ export const ResourceDeleteModal: FC<ResourceDeleteModalProps> = ({ kind, data, 
             data-test-id="cancel-delete-popup-button"
             key="cancel"
             variant="link"
+            isDisabled={isDeleting}
             onClick={onCancel}
           >
             {t('Cancel')}
@@ -56,7 +67,9 @@ export const ResourceDeleteModal: FC<ResourceDeleteModalProps> = ({ kind, data, 
             data-test-id="confirm-delete-popup-button"
             key="confirm"
             variant="danger"
-            onClick={onDelete}
+            isLoading={isDeleting}
+            isDisabled={isDeleting}
+            onClick={handleDelete}
           >
             {t('Delete')}
           </Button>

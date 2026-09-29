@@ -11,7 +11,7 @@ import {
 import { ExclamationCircleIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Status } from '../../api/loki';
+import { Status } from '../../api/query-response';
 import { getBuildInfo, getLimits, getLokiMetrics, getStatus } from '../../api/routes';
 import { ContextSingleton } from '../../utils/context';
 import {
@@ -145,9 +145,11 @@ export const ErrorComponent: React.FC<ErrorProps> = ({ title, error }) => {
             {status && <StatusTexts status={status} />}
             {statusError && (
               <Content component={ContentVariants.blockquote}>
-                {t('Check for errors in health dashboard. Status endpoint is returning: {{statusError}}', {
-                  statusError
-                })}
+                {ContextSingleton.isStandalone()
+                  ? t('Status endpoint is returning: {{statusError}}', { statusError })
+                  : t('Check for errors in health dashboard. Status endpoint is returning: {{statusError}}', {
+                      statusError
+                    })}
               </Content>
             )}
           </Content>

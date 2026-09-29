@@ -12,12 +12,14 @@ import (
 	"github.com/netobserv/network-observability-console-plugin/pkg/config"
 	"github.com/netobserv/network-observability-console-plugin/pkg/handler/apierrors"
 	"github.com/netobserv/network-observability-console-plugin/pkg/loki"
+	"github.com/netobserv/network-observability-console-plugin/pkg/merger"
 	"github.com/netobserv/network-observability-console-plugin/pkg/metrics"
 	"github.com/netobserv/network-observability-console-plugin/pkg/model"
 	"github.com/netobserv/network-observability-console-plugin/pkg/model/fields"
 	"github.com/netobserv/network-observability-console-plugin/pkg/model/filters"
 	"github.com/netobserv/network-observability-console-plugin/pkg/prometheus"
 	"github.com/netobserv/network-observability-console-plugin/pkg/utils/constants"
+	"github.com/netobserv/network-observability-console-plugin/pkg/utils/queryparams"
 
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
@@ -82,8 +84,8 @@ func (h *Handlers) GetTopology(ctx context.Context) func(w http.ResponseWriter, 
 	}
 }
 
-func (h *Handlers) extractTopologyQueryParams(params url.Values, ds constants.DataSource) (*loki.TopologyInput, filters.MultiQueries, v1.Range, int, error) {
-	in := loki.TopologyInput{DataSource: ds}
+func (h *Handlers) extractTopologyQueryParams(params url.Values, ds constants.DataSource) (*queryparams.TopologyInput, filters.MultiQueries, v1.Range, int, error) {
+	in := queryparams.TopologyInput{DataSource: ds}
 	qr := v1.Range{}
 	var reqLimit int
 	var err error
@@ -152,7 +154,7 @@ func (h *Handlers) getTopologyFlows(ctx context.Context, cl clients, params url.
 	hlog.Debugf("GetTopology query params: %s", params)
 
 	dataSources := make(map[constants.DataSource]bool)
-	if h.Cfg.Loki.UseMocks {
+	if h.Cfg.ConsoleMode == config.Mock {
 		dataSources["mock"] = true
 	}
 
@@ -161,7 +163,7 @@ func (h *Handlers) getTopologyFlows(ctx context.Context, cl clients, params url.
 		return nil, http.StatusBadRequest, err
 	}
 	isDev := params.Get(namespaceKey) != ""
-	merger := loki.NewMatrixMerger(reqLimit)
+	mm := merger.NewMatrixMerger(reqLimit)
 	if len(filterGroups) > 1 {
 		// match any, and multiple filters => run in parallel then aggregate
 		var lokiQ []string
@@ -179,7 +181,7 @@ func (h *Handlers) getTopologyFlows(ctx context.Context, cl clients, params url.
 				dataSources[constants.DataSourceLoki] = true
 			}
 		}
-		code, err := cl.fetchParallel(ctx, lokiQ, promQ, merger, isDev)
+		code, err := cl.fetchParallel(ctx, lokiQ, promQ, mm, isDev)
 		if err != nil {
 			return nil, code, err
 		}
@@ -199,13 +201,13 @@ func (h *Handlers) getTopologyFlows(ctx context.Context, cl clients, params url.
 		if promQ != nil {
 			dataSources[constants.DataSourceProm] = true
 		}
-		code, err = cl.fetchSingle(ctx, lokiQ, promQ, merger, isDev)
+		code, err = cl.fetchSingle(ctx, lokiQ, promQ, mm, isDev)
 		if err != nil {
 			return nil, code, err
 		}
 	}
 
-	qresp := merger.Get()
+	qresp := mm.Get()
 	qresp.Stats.DataSources = []constants.DataSource{}
 	for str, ok := range dataSources {
 		if ok {
@@ -272,7 +274,7 @@ func buildTopologyQuery(
 	cfg *config.Config,
 	promInventory *prometheus.Inventory,
 	filters filters.SingleQuery,
-	in *loki.TopologyInput,
+	in *queryparams.TopologyInput,
 	qr *v1.Range,
 	isDev bool,
 ) (string, *prometheus.Query, int, error) {
@@ -310,7 +312,7 @@ func buildTopologyQuery(
 	return EncodeQuery(qb.Build()), nil, http.StatusOK, nil
 }
 
-func getEligiblePromMetric(kl map[string][]string, promInventory *prometheus.Inventory, filters filters.SingleQuery, in *loki.TopologyInput, isDev bool) (*prometheus.SearchResult, string) {
+func getEligiblePromMetric(kl map[string][]string, promInventory *prometheus.Inventory, filters filters.SingleQuery, in *queryparams.TopologyInput, isDev bool) (*prometheus.SearchResult, string) {
 	if in.DataSource != constants.DataSourceAuto && in.DataSource != constants.DataSourceProm {
 		return nil, ""
 	}

@@ -60,66 +60,105 @@ describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['
         // Updating ebpf Sampling to 1
         cy.get(pluginSelectors.editFlowcollector).click()
         cy.get('#root_spec_agent_accordion-toggle').click()
-        cy.get('#root_spec_agent_ebpf_sampling').clear().type('1')
+        cy.get('#root_spec_agent_ebpf_sampling').clear()
+        cy.get('#root_spec_agent_ebpf_sampling').type('1')
         cy.get(pluginSelectors.update).click()
 
-        // Wait for flowcollector to get ready
-        cy.wait(20000)
-        cy.get(flowcollectorStatusSelectors.readyRow,{ timeout: 60000 }).should('exist')
+        // Wait for FC reconciliation: first wait for NOT Ready (operator started reconciling),
+        // then wait for Ready again. The first wait may time out if reconciliation is instant.
+        cy.adminCLI(`oc wait --for=condition=Ready=false flowcollector/cluster --timeout=30s`, {
+            failOnNonZeroExit: false
+        })
+        cy.adminCLI(`oc wait --for=condition=Ready flowcollector/cluster --timeout=180s`, { timeout: 200000 })
+        cy.reload(true)
+        cy.get(flowcollectorStatusSelectors.readyRow, { timeout: 60000 }).should('exist')
             .should('have.attr', 'data-test-status', 'True')
             .should('have.attr', 'data-test-reason', 'Ready')
         cy.get(pluginSelectors.openNetworkTraffic).click()
 
-        // Verify PacketDrop data is seen
-        cy.get('li.overviewTabButton').trigger('click')
+        // Wait for Network Traffic page to fully load after navigation
+        cy.url({ timeout: 30000 }).should('include', '/netflow-traffic')
+        cy.get('#overview-container', { timeout: 60000 }).should('exist')
+
+        // Verify PacketDrop data is seen in Packet Drops view
+        cy.get('li.overviewTabButton', { timeout: 30000 }).trigger('click')
         netflowPage.clearAllFilters()
         netflowPage.setAutoRefresh()
+        netflowPage.selectView('pktdrop')
         cy.checkPanel(overviewSelectors.defaultPacketDropPanels)
-        cy.checkPanelsNum(6);
+        cy.checkPanelsNum(overviewSelectors.defaultPacketDropPanels.length);
+        netflowPage.selectView('all')
         cy.checkNetflowTraffic()
         netflowPage.resetClearFilters()
     })
+    it("(OCP-88744, kapjain) Verify OLM page 'cluster' click opens status page", function () {
+        Operator.visitFlowcollector()
 
-        it("(OCP-88744, kapjain) Verify status indicator on Network Health page", function () {
-            cy.visit('/network-health')
-
-            // cy.get('#content-scrollable', { timeout: 30000 }).should('exist')
-            cy.get(flowcollectorStatusSelectors.statusIndicator).should('exist')
-                .find('span span').trigger('mouseenter', { force: true })
-            cy.get(flowcollectorStatusSelectors.statusTooltip, { timeout: 10000 })
-                .should('contain.text', 'FlowCollector is ready')
-            cy.get(flowcollectorStatusSelectors.statusIndicator).click()
-            cy.contains('Network Observability FlowCollector status', { timeout: 30000 }).should('exist')
+        cy.contains('td a', 'cluster', { timeout: 30000 }).should('be.visible')
+            .invoke('attr', 'href').then(href => {
+            cy.visit(href as string)
         })
 
-        it("(OCP-88744, kapjain) Verify status indicator on Network Traffic page", function () {
-            cy.visit('/netflow-traffic')
+        cy.url({ timeout: 30000 }).should('include', '/flows.netobserv.io~v1beta2~FlowCollector/cluster')
+        cy.contains('Network Observability FlowCollector', { timeout: 30000 }).should('exist')
+        cy.get(flowcollectorStatusSelectors.readyRow, { timeout: 120000 }).should('exist')
+    })
 
-            // cy.get('#overview-container', { timeout: 60000 }).should('exist')
-            cy.get(flowcollectorStatusSelectors.statusIndicator).should('exist')
-                .find('span span').trigger('mouseenter', { force: true })
-            cy.get(flowcollectorStatusSelectors.statusTooltip, { timeout: 10000 })
-                .should('contain.text', 'FlowCollector is ready')
-            cy.get(flowcollectorStatusSelectors.statusIndicator).click()
-            cy.contains('Network Observability FlowCollector status', { timeout: 30000 }).should('exist')
+    it("(OCP-88744 kapjain) Verify status indicator on Network Health page", function () {
+        // Ensure FC is fully ready before checking status on a different page
+        cy.adminCLI(`oc wait --for=condition=Ready flowcollector/cluster --timeout=120s`, {
+            failOnNonZeroExit: false, timeout: 140000
         })
+        cy.visit('/network-health')
 
-        it("(OCP-88744, kapjain) Verify FlowCollector status via search and cluster columns", function () {
-            // Search for FlowCollector via search page
-            searchPage.navToSearchPage()
-            searchPage.chooseResourceType('FlowCollector')
-            cy.byTestID('data-view-table', { timeout: 30000 }).should('exist')
-            cy.byTestID('data-view-cell-cluster-name').should('exist')
+        cy.get(flowcollectorStatusSelectors.statusIndicator).should('exist')
+            .find('span span').first().trigger('mouseenter', { force: true })
+        cy.get(flowcollectorStatusSelectors.statusTooltip, { timeout: 30000 })
+            .should('contain.text', 'FlowCollector is ready')
+        cy.get(flowcollectorStatusSelectors.statusIndicator).click()
+        cy.contains('Network Observability FlowCollector status', { timeout: 30000 }).should('exist')
+    })
 
-            // Verify additionalPrinterColumn headers
-            cy.byTestID('additional-printer-column-header-Agent').should('exist')
-            cy.byTestID('additional-printer-column-header-Processor').should('exist')
-            cy.byTestID('additional-printer-column-header-Plugin').should('exist')
-            cy.byTestID('additional-printer-column-header-Status').should('exist')
+    it("(OCP-88744 kapjain) Verify status indicator on Network Traffic page", function () {
+        cy.visit('/netflow-traffic')
 
-            // Verify status column shows Ready
-            cy.byTestID('additional-printer-column-data-Status').should('contain.text', 'Ready')
-        })
+        cy.get(flowcollectorStatusSelectors.statusIndicator).should('exist')
+            .find('span span').first().trigger('mouseenter', { force: true })
+        cy.get(flowcollectorStatusSelectors.statusTooltip, { timeout: 10000 })
+            .should('contain.text', 'FlowCollector is ready')
+        cy.get(flowcollectorStatusSelectors.statusIndicator).click()
+        cy.contains('Network Observability FlowCollector status', { timeout: 30000 }).should('exist')
+    })
+    it("(OCP-88744, kapjain) Verify FlowCollector status via search and cluster columns", function () {
+        // Search for FlowCollector via search page
+        searchPage.navToSearchPage()
+        searchPage.chooseResourceType('FlowCollector')
+        cy.byTestID('data-view-table', { timeout: 30000 }).should('exist')
+        cy.byTestID('data-view-cell-cluster-name').should('exist')
+
+        // Verify additionalPrinterColumn headers
+        cy.byTestID('additional-printer-column-header-Agent').should('exist')
+        cy.byTestID('additional-printer-column-header-Processor').should('exist')
+        cy.byTestID('additional-printer-column-header-Web Console').should('exist')
+        cy.byTestID('additional-printer-column-header-Status').should('exist')
+
+        // Verify status column shows Ready
+        cy.byTestID('additional-printer-column-data-Status').should('contain.text', 'Ready')
+    })
+    it("(OCP-88744, kapjain) Verify delete FlowCollector reloads status page with only create option", function () {
+        flowcollectorStatusPage.visit()
+
+        cy.get(flowcollectorStatusSelectors.deleteFlowCollectorBtn).click()
+        cy.get(flowcollectorStatusSelectors.deleteModal, { timeout: 10000 }).should('exist')
+        cy.get(flowcollectorStatusSelectors.confirmDeleteBtn).should('exist').click()
+
+        cy.get(flowcollectorStatusSelectors.createFlowCollectorBtn, { timeout: 60000 }).should('exist')
+        cy.contains('No FlowCollector resource was found', { timeout: 30000 }).should('exist')
+        cy.contains('Create one to enable network flow collection').should('exist')
+
+        cy.get(flowcollectorStatusSelectors.createFlowCollectorBtn)
+            .should('contain.text', 'Create FlowCollector')
+    })
 
     after("after all tests", function () {
         Operator.deleteFlowCollector()

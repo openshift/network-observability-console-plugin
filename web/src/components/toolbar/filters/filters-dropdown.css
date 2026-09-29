@@ -5,9 +5,11 @@
 }
 
 #direction-column-filter-dropdowns {
-  min-width: 370px;
+  min-width: min(370px, 100%);
+  max-width: 100%;
 }
 
 #direction-filter-dropdown-container, #column-filter-dropdown-container {
   flex: 1;
+  min-width: 0;
 }
