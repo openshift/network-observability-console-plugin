@@ -58,6 +58,7 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.68.0",
     "@typescript-eslint/typescript-estree": "^8.0.0",
+    "ajv": "^8.20.0",
     "babel-loader": "^10.0.0",
     "babel-preset-react": "^6.24.1",
     "copy-webpack-plugin": "14.0.0",
