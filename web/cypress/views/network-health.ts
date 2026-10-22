@@ -42,7 +42,8 @@ export const healthRuleWizard = {
   // Back is handled by the uncaught:exception filter at the top of the spec.
   reviewRoundTrip: () => {
     healthRuleWizard.next();
-    cy.get('.monaco-editor', { timeout: 60000 }).should('be.visible');
+    // Monaco (ResourceYAMLEditor) can take a long time to initialize in CI.
+    cy.get('.monaco-editor', { timeout: 120000 }).should('be.visible');
     healthRuleWizard.back();
     cy.get(networkHealthSelectors.dynamicForm, { timeout: 60000 }).should('be.visible');
   },
@@ -72,6 +73,27 @@ export namespace networkHealthFiltersSelectors {
   export const nameInput = '[data-test="health-name-filter"] input';
   export const clearAll = '[data-test="health-filters-clear-all"]';
   export const option = (filterId: string, value: string) => `[data-test="${filterId}-option-${value}"]`;
+}
+
+const waitForHealthCard = (name: string, retries = 2): void => {
+    const selector = `[data-test^="health-card-${name}"]`
+    const pollForCard = (attempt = 0, maxAttempts = 12): void => {
+        cy.get('body').then($body => {
+            if ($body.find(selector).length > 0) {
+                return
+            }
+            if (attempt < maxAttempts) {
+                cy.wait(10000)
+                pollForCard(attempt + 1, maxAttempts)
+            } else if (retries > 0) {
+                cy.log(`health-card-${name} not found, reloading (${retries} retries left)`)
+                cy.reload()
+                cy.get('#content-scrollable', { timeout: 30000 }).should('exist')
+                waitForHealthCard(name, retries - 1)
+            }
+        })
+    }
+    pollForCard()
 }
 
 export const networkHealth = {
@@ -106,14 +128,38 @@ export const networkHealth = {
   },
   navigateToAlertPage: (name: string) => {
     networkHealth.clickOnAlert(name);
-    cy.get(networkHealthSelectors.sidePanel)
-      .should('be.visible')
-      .then(() => {
-        cy.get('button[aria-label="Kebab toggle"]')
-          .first()
-          .click()
-          .then(() => {
-            // verify Runbooks
+    cy.get(networkHealthSelectors.sidePanel).should('be.visible');
+
+    // Rows mix real alerts with recording-rule scores; only alert rows with a runbook_url
+    // annotation show "View runbook", and row order isn't fixed, so probe in order instead
+    // of assuming index 0.
+    cy.get('[data-test="rule-details-row"]').then($rows => {
+      cy.log(`navigateToAlertPage(${name}): found ${$rows.length} rule-details-row entries`);
+      $rows.each((i, row) => {
+        cy.log(`navigateToAlertPage(${name}): row[${i}] = ${Cypress.$(row).text().replace(/\s+/g, ' ').trim()}`);
+      });
+    });
+
+    // The page's live 15s auto-refresh (netflowPage.setAutoRefresh) can re-render the drawer
+    // mid-interaction, so a kebab opened right as it refreshes can come back empty even when
+    // the row genuinely has a runbook. Retry the same row before moving on.
+    const sameRowRetries = 3;
+    const tryKebab = (index: number, retriesLeft = sameRowRetries): void => {
+      cy.get('[data-test="rule-details-row"]').then($rows => {
+        if (index >= $rows.length) {
+          throw new Error(
+            `navigateToAlertPage(${name}): no "View runbook" link found in any of the ${$rows.length} row(s) ` +
+              `(each retried up to ${sameRowRetries} times to rule out the 15s auto-refresh race). ` +
+              `See preceding "navigateToAlertPage(${name}): row[i] = ..." logs for row content.`
+          );
+        }
+
+        cy.log(`navigateToAlertPage(${name}): opening kebab for row[${index}] (retries left: ${retriesLeft})`);
+        cy.get('[data-test="rule-details-row"]').eq(index).find('button[aria-label="Kebab toggle"]').click();
+
+        cy.get('body').then($body => {
+          if ($body.text().includes('View runbook')) {
+            cy.log(`navigateToAlertPage(${name}): row[${index}] has "View runbook"`);
             cy.contains('View runbook').should('have.attr', 'href').and('include', 'https');
             // Inspect alert
             cy.contains('Inspect alert')
@@ -121,8 +167,26 @@ export const networkHealth = {
               .then(() => {
                 cy.byTestID('empty-box').should('not.exist');
               });
-          });
+          } else if (retriesLeft > 0) {
+            cy.log(
+              `navigateToAlertPage(${name}): row[${index}] has no "View runbook" yet, ` +
+                `retrying same row in case of an auto-refresh race (${retriesLeft} retries left)`
+            );
+            cy.get('body').type('{esc}');
+            cy.wait(3000);
+            tryKebab(index, retriesLeft - 1);
+          } else {
+            cy.log(
+              `navigateToAlertPage(${name}): row[${index}] exhausted ${sameRowRetries} retries with no "View runbook", trying next row`
+            );
+            // Close this row's dropdown before probing the next one.
+            cy.get('body').type('{esc}');
+            tryKebab(index + 1);
+          }
+        });
       });
+    };
+    tryKebab(0);
   },
   navigateToNetflowTrafficPage: (name: string) => {
     networkHealth.clickOnAlert(name);

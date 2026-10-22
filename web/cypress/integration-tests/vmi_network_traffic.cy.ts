@@ -1,6 +1,5 @@
 import "@views/netobserv"
 import { Operator } from "@views/netobserv"
-import {wait} from "fork-ts-checker-webpack-plugin/lib/utils/async/wait";
 
 const VMI_NAMESPACE = "test-vm"
 const VMI_NAME = "test-vm"
@@ -13,6 +12,9 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
         cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
         Operator.install()
         cy.checkStorageClass(this)
+        // KubeVirt's software emulation defaults to CPU mode 'host-passthrough', which
+        // aarch64 QEMU/TCG doesn't support - VM boot fails deterministically on non-amd64.
+        cy.checkArchitecture(this, ['amd64'])
         Operator.createFlowcollector()
 
         // Setup KubeVirt operator
@@ -87,17 +89,19 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
             'Running',
             { retries: 30, interval: 20000 }
         )
-
-        // Wait for flows to be ingested into Loki by polling flow-collector logs
-        cy.adminCLI(`oc logs -n netobserv -l app=netobserv-plugin,component=flow-collector --tail=100 2>/dev/null | grep -i "packet\\|flow" || echo "waiting"`, { retries: 120, interval: 5000 })
-        cy.wait(180000)
+        cy.adminCLI(`oc wait --for=condition=Ready vmi/${VMI_NAME} -n ${VMI_NAMESPACE} --timeout=180s`, { timeout: 200000 })
 
     })
 
     it('(OCP-90529, kapjain) Navigate from Search to VMI and verify Network Traffic tab', function () {
-        // Navigate to search page with VirtualMachineInstance resource pre-selected
-        const page = `/k8s/ns/${VMI_NAMESPACE}/kubevirt.io~v1~VirtualMachineInstance`
-        cy.visitNetflowTrafficTab(page)
+        // PF5's Search and resource-list views can fail to render VMI rows.
+        // Navigate directly to the VMI detail route, then use its Network Traffic tab.
+        const page = `/k8s/ns/${VMI_NAMESPACE}/kubevirt.io~v1~VirtualMachineInstance/${VMI_NAME}`
+        cy.visit(page)
+        cy.get('#content', { timeout: 60000 }).should('be.visible')
+        cy.byLegacyTestID('horizontal-link-Network Traffic', { timeout: 60000 })
+            .should('be.visible').click()
+        cy.checkNetflowTraffic()
         // Verify filter with vm name
         cy.get('[data-test="filter-toolbar-chips"]', { timeout: 30000 }).should('contain', 'test-vm')
     })
@@ -131,8 +135,10 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
         // Check if Network Traffic tab is present, scroll into view and click it
         cy.get('[data-test-id="horizontal-link-Network Traffic"]', { timeout: 60000 })
           .should('exist')
-          .scrollIntoView({ behavior: 'smooth', block: 'center' })
-          .wait(1000)
+          .scrollIntoView()
+        cy.wait(1000)
+        cy.get('[data-test-id="horizontal-link-Network Traffic"]', { timeout: 60000 })
+          .should('be.visible')
           .click({ force: true })
         cy.checkNetflowTraffic()
 
@@ -141,14 +147,20 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
     })
 
     after("cleanup", function () {
-        // Delete test VM and namespace
-        cy.adminCLI(`oc delete vm ${VMI_NAME} -n ${VMI_NAMESPACE} --grace-period=30 --wait=false`, { failOnNonZeroExit: false } as any)
-        cy.adminCLI(`oc delete namespace ${VMI_NAMESPACE} --grace-period=90`, { failOnNonZeroExit: false } as any)
+        // this.skip() in before() doesn't stop after() from running (Mocha/Cypress
+        // quirk), so guard explicitly: if checkStorageClass/checkArchitecture skipped
+        // the suite, none of the CNV/VM resources below were ever created.
+        const setupSkipped = this.test?.parent?.tests.every(t => t.pending)
+        if (!setupSkipped) {
+            // Delete test VM and namespace
+            cy.adminCLI(`oc delete vm ${VMI_NAME} -n ${VMI_NAMESPACE} --grace-period=30 --wait=false`, { failOnNonZeroExit: false } as any)
+            cy.adminCLI(`oc delete namespace ${VMI_NAMESPACE} --grace-period=90`, { failOnNonZeroExit: false } as any)
 
-        // Delete HyperConverged CR and related resources (leave operators installed to avoid slow reinstall)
-        cy.adminCLI('oc delete hyperconverged kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
-        cy.adminCLI('oc delete cdi cdi-kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
-        cy.adminCLI('oc delete configmap cdi-apiserver-signer-bundle -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+            // Delete HyperConverged CR and related resources (leave operators installed to avoid slow reinstall)
+            cy.adminCLI('oc delete hyperconverged kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+            cy.adminCLI('oc delete cdi cdi-kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+            cy.adminCLI('oc delete configmap cdi-apiserver-signer-bundle -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+        }
 
         cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
     })

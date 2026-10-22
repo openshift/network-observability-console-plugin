@@ -19,9 +19,17 @@ spec:
       - name: "use-vc"
   containers:
     - name: utils
-      image: docker.io/massenz/dnsutils:2.4.0
-      # do dns requests to non-existent service to induce dns errors
-      command: ["/bin/sh", "-ec", "while :; do dig nginx-service.test.svc.cluster.local; sleep 1 ; done"]
+      image: registry.k8s.io/e2e-test-images/jessie-dnsutils:1.7
+      # Flood NxDomain queries to push the NxDomain percentage above alert
+      # thresholds even in clusters with heavy background DNS traffic.
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          for i in 1 2 3 4 5; do
+            (while :; do dig +short nonexistent-$i.test.svc.cluster.local; done) &
+          done
+          wait
       securityContext:
         allowPrivilegeEscalation: false
         capabilities:
