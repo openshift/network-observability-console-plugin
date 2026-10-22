@@ -4,9 +4,9 @@ import { netflowPage } from "@views/netflow-page"
 describe('(OCP-72610) Export automation', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
-        cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
-        cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
-
+        cy.setAsClusterAdmin();
+        cy.uiLoginDefaultUser();
+            
         Operator.install()
         cy.checkStorageClass(this)
         Operator.createFlowcollector()
@@ -41,9 +41,14 @@ describe('(OCP-72610) Export automation', { tags: ['Network_Observability'] }, f
         cy.get('#export-button').should('exist').click()
         cy.byTestID('export-modal').should('be.visible')
         cy.exec("rm -f cypress/downloads/*.csv", { failOnNonZeroExit: false })
-        cy.byTestID('export-modal').within(() => {
-            cy.byTestID('export-button').should('exist').click()
-        })
+        cy.byTestID('export-modal').should('be.visible')
+        // Export modal content can rerender while the CSV is prepared. Re-query
+        // the button after the modal is stable instead of clicking a stale subject.
+        cy.get('[data-test="export-modal"]').find('[data-test="export-button"]')
+            .should('be.visible')
+            .then(() => {
+                cy.get('[data-test="export-modal"]').find('[data-test="export-button"]').click({ force: true })
+            })
         const waitForCsv = (retries = 5): void => {
             cy.exec("ls cypress/downloads", { failOnNonZeroExit: false }).then((response) => {
                 const files = (response.stdout || '').trim().split('\n').filter(f => f.endsWith('.csv'))
@@ -82,6 +87,6 @@ describe('(OCP-72610) Export automation', { tags: ['Network_Observability'] }, f
     })
 
     after("all tests", function () {
-        cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
+        cy.unsetAsClusterAdmin()
     })
 })

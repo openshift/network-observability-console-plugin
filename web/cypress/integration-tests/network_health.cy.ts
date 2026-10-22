@@ -1,14 +1,15 @@
 import { netflowPage, topologyPage } from "@views/netflow-page"
 import { Operator } from "@views/netobserv"
 import { networkHealth, networkHealthSelectors } from "@views/network-health"
+import { promQueryCommand, waitForAlertsFiring } from "../support/prometheus"
 
 const alertServerity = ["Info", "Warning", "Critical"]
 
 describe('(OCP-84821) Network Health test', { tags: ['Network_Observability'] }, function () {
 
     before('any test', function () {
-        cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
-        cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
+        cy.setAsClusterAdmin();
+        cy.uiLoginDefaultUser();
 
         Operator.install()
         cy.checkStorageClass(this)
@@ -117,53 +118,25 @@ describe('(OCP-84821) Network Health test', { tags: ['Network_Observability'] },
         // Pipeline: metric accumulation → rule evaluation → for: 5m duration → alert fires.
         // With correct dns_flows_total metrics, alerts need ~7-8 min:
         //   ~2 min for metrics accumulation + ~5 min for: duration + evaluation intervals.
-        const waitForAlerts = (attempt = 0): void => {
-            const maxAttempts = 60
-            cy.adminCLI(
-                `oc exec -n openshift-monitoring -c prometheus prometheus-k8s-0 -- ` +
-                `sh -c "curl -sf 'http://localhost:9090/api/v1/alerts' 2>/dev/null"`,
-                { failOnNonZeroExit: false, timeout: 120000 }
-            ).then((result: Cypress.Exec) => {
-                const output = result.stdout || ''
-                const count = (output.match(/DNSNxDomain/g) || []).length
-                cy.log(`Prometheus DNSNxDomain alert count: ${count} (attempt ${attempt + 1}/${maxAttempts})`)
-                if (count > 0) {
-                    return
-                }
-                if (attempt < maxAttempts) {
-                    cy.wait(10000)
-                    waitForAlerts(attempt + 1)
-                } else {
+        waitForAlertsFiring(['DNSNxDomain'], {
+            attempts: 60,
+            labels: { namespace: 'dns-traffic' },
+            diagnostics: [
+                {
                     // Dump the actual PrometheusRule PromQL to verify if operator has the _count fix
-                    cy.adminCLI(
-                        `oc get prometheusrule -n netobserv -o jsonpath='{range .items[*].spec.groups[*].rules[*]}{.alert}{" => "}{.expr}{\"\\n\"}{end}'`,
-                        { failOnNonZeroExit: false, timeout: 60000 }
-                    ).then((promRuleDump: Cypress.Exec) => {
-                        const promRuleOutput = promRuleDump.stdout || ''
-                        const dnsRules = promRuleOutput.split('\n')
-                            .filter((l: string) => l.includes('DNSNxDomain'))
-                            .slice(0, 5)
-                            .join(' | ')
-
-                        // Use --data-urlencode for safe PromQL query (avoids {} [] encoding issues)
-                        cy.adminCLI(
-                            `oc exec -n openshift-monitoring -c prometheus prometheus-k8s-0 -- ` +
-                            `sh -c "curl -s --fail-with-body -G 'http://localhost:9090/api/v1/query' ` +
-                            `--data-urlencode 'query=count(netobserv_namespace_dns_flows_total) by (DnsFlagsResponseCode)'"`,
-                            { failOnNonZeroExit: false, timeout: 120000 }
-                        ).then((labelDump: Cypress.Exec) => {
-                            throw new Error(
-                                'DNSNxDomain alerts not firing after 10 minutes of polling. ' +
-                                `PrometheusRule PromQL for DNSNxDomain: [${dnsRules || '(none)'}]. ` +
-                                `dns_flows_total labels: ${(labelDump.stdout || '').substring(0, 500)}. ` +
-                                'Check gather-extra artifacts for operator/FLP logs and Prometheus state.'
-                            )
-                        })
-                    })
+                    label: 'PrometheusRule PromQL for DNSNxDomain',
+                    command: `oc get prometheusrule -n netobserv -o jsonpath='{range .items[*].spec.groups[*].rules[*]}{.alert}{" => "}{.expr}{\"\\n\"}{end}'`,
+                    format: out => out.split('\n')
+                        .filter((l: string) => l.includes('DNSNxDomain'))
+                        .slice(0, 5)
+                        .join(' | ') || '(none)'
+                },
+                {
+                    label: 'dns_flows_total labels',
+                    command: promQueryCommand('count(netobserv_namespace_dns_flows_total) by (DnsFlagsResponseCode)')
                 }
-            })
-        }
-        waitForAlerts()
+            ]
+        })
     })
 
     beforeEach('test', function () {
@@ -232,6 +205,6 @@ describe('(OCP-84821) Network Health test', { tags: ['Network_Observability'] },
     after("all tests", function () {
         cy.adminCLI('oc delete -f cypress/fixtures/dns_errors.yaml --ignore-not-found')
         Operator.deleteFlowCollector()
-        cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
+        cy.unsetAsClusterAdmin()
     })
 })

@@ -1,0 +1,77 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  - package-ecosystem: "gomod" # See documentation for possible values
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+    groups:
+      k8s:
+        applies-to: version-updates
+        patterns:
+          - "k8s.io/*"
+
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    groups:
+      cypress-npm:
+        applies-to: version-updates
+        patterns:
+          - "cypress"
+    ignore:
+      - dependency-name: "mobx"
+        update-types: ["version-update:semver-major"] # must stay aligned with plugin SDK
+      - dependency-name: "cypress"
+        update-types: ["version-update:semver-major"] # breaking changes in cypress 16, such as removal of cy.exec
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "library/golang"
+    groups:
+      cypress-docker:
+        applies-to: version-updates
+        patterns:
+          - "cypress/*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "npm"
+    directory: "/web"
+    target-branch: "main-pf5"
+    schedule:
+      interval: "monthly"
+    groups:
+      cypress-npm:
+        applies-to: version-updates
+        patterns:
+          - "cypress"
+    ignore:
+      - dependency-name: "mobx"
+        update-types: ["version-update:semver-major"] # must stay aligned with plugin SDK
+      - dependency-name: "cypress"
+        update-types: ["version-update:semver-major"] # breaking changes in cypress 16, such as removal of cy.exec
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    target-branch: "main-pf5"
+    schedule:
+      interval: "monthly"
+    ignore:
+      - dependency-name: "library/golang"
+    groups:
+      cypress-docker:
+        applies-to: version-updates
+        patterns:
+          - "cypress/*"

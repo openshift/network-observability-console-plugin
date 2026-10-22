@@ -1,6 +1,5 @@
 import "@views/netobserv"
 import { Operator } from "@views/netobserv"
-import {wait} from "fork-ts-checker-webpack-plugin/lib/utils/async/wait";
 
 const VMI_NAMESPACE = "test-vm"
 const VMI_NAME = "test-vm"
@@ -8,13 +7,16 @@ const VMI_NAME = "test-vm"
 describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observability'] }, function () {
 
     before('setup', function () {
-        // Add cluster admin role and login first (like other tests)
-        cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
-        cy.uiLogin(Cypress.env('LOGIN_IDP'), Cypress.env('LOGIN_USERNAME'), Cypress.env('LOGIN_PASSWORD'))
+        cy.setAsClusterAdmin();
+        cy.uiLoginDefaultUser();
+
         Operator.install()
         cy.checkStorageClass(this)
+        // KubeVirt's software emulation defaults to CPU mode 'host-passthrough', which
+        // aarch64 QEMU/TCG doesn't support - VM boot fails deterministically on non-amd64.
+        cy.checkArchitecture(this, ['amd64'])
         Operator.createFlowcollector()
-
+        
         // Setup KubeVirt operator
         cy.adminCLI(`oc create namespace openshift-cnv`, { failOnNonZeroExit: false } as any)
         cy.adminCLI(`oc apply -f ./cypress/fixtures/vmi/kubevirt-operator-group.yaml`)
@@ -89,9 +91,8 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
         )
 
         // Wait for flows to be ingested into Loki by polling flow-collector logs
-        cy.adminCLI(`oc logs -n netobserv -l app=netobserv-plugin,component=flow-collector --tail=100 2>/dev/null | grep -i "packet\\|flow" || echo "waiting"`, { retries: 120, interval: 5000 })
+        cy.adminCLI(`oc logs -n netobserv -l app=netobserv-plugin,component=flow-collector --tail=100 2>/dev/null | grep -i "packet\\|flow" || echo "waiting"`)
         cy.wait(180000)
-
     })
 
     it('(OCP-90529, kapjain) Navigate from Search to VMI and verify Network Traffic tab', function () {
@@ -124,15 +125,28 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
         cy.get('#content', { timeout: 30000 }).should('be.visible')
         cy.wait(3000)
 
-        // Wait for page title to settle and not cover the tabs
+        // Wait for page title to settle and not cover the tabs.
         cy.get('h1', { timeout: 10000 }).should('be.visible')
         cy.wait(1000)
+        // PF6 can load the virtualization welcome dialog asynchronously after
+        // navigation. Dismiss it again and verify no visible welcome dialog can
+        // cover the Network Traffic tab.
+        cy.dismissWelcomeModal()
+        cy.get('body').should($body => {
+          const welcome = $body.find('[role="dialog"]:visible').filter((_, el) =>
+            Cypress.$(el).text().includes('Welcome to OpenShift Virtualization'))
+          expect(welcome).to.have.length(0)
+        })
 
         // Check if Network Traffic tab is present, scroll into view and click it
         cy.get('[data-test-id="horizontal-link-Network Traffic"]', { timeout: 60000 })
           .should('exist')
-          .scrollIntoView({ behavior: 'smooth', block: 'center' })
-          .wait(1000)
+          .scrollIntoView()
+        cy.wait(1000)
+        // The virtualization page rerenders its tabs after scrolling; acquire a
+        // fresh subject before clicking to avoid a detached-element failure.
+        cy.get('[data-test-id="horizontal-link-Network Traffic"]', { timeout: 60000 })
+          .should('be.visible')
           .click({ force: true })
         cy.checkNetflowTraffic()
 
@@ -141,15 +155,21 @@ describe('(OCP-90529) Network Traffic Tab on VMI Page', { tags: ['Network_Observ
     })
 
     after("cleanup", function () {
-        // Delete test VM and namespace
-        cy.adminCLI(`oc delete vm ${VMI_NAME} -n ${VMI_NAMESPACE} --grace-period=30 --wait=false`, { failOnNonZeroExit: false } as any)
-        cy.adminCLI(`oc delete namespace ${VMI_NAMESPACE} --grace-period=90`, { failOnNonZeroExit: false } as any)
+        // this.skip() in before() doesn't stop after() from running (Mocha/Cypress
+        // quirk), so guard explicitly: if checkStorageClass/checkArchitecture skipped
+        // the suite, none of the CNV/VM resources below were ever created.
+        const setupSkipped = this.test?.parent?.tests.every(t => t.pending)
+        if (!setupSkipped) {
+            // Delete test VM and namespace
+            cy.adminCLI(`oc delete vm ${VMI_NAME} -n ${VMI_NAMESPACE} --grace-period=30 --wait=false`, { failOnNonZeroExit: false } as any)
+            cy.adminCLI(`oc delete namespace ${VMI_NAMESPACE} --grace-period=90`, { failOnNonZeroExit: false } as any)
 
-        // Delete HyperConverged CR and related resources (leave operators installed to avoid slow reinstall)
-        cy.adminCLI('oc delete hyperconverged kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
-        cy.adminCLI('oc delete cdi cdi-kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
-        cy.adminCLI('oc delete configmap cdi-apiserver-signer-bundle -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+            // Delete HyperConverged CR and related resources (leave operators installed to avoid slow reinstall)
+            cy.adminCLI('oc delete hyperconverged kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+            cy.adminCLI('oc delete cdi cdi-kubevirt-hyperconverged -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+            cy.adminCLI('oc delete configmap cdi-apiserver-signer-bundle -n openshift-cnv --wait=false', { failOnNonZeroExit: false } as any)
+        }
 
-        cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${Cypress.env('LOGIN_USERNAME')}`)
+        cy.unsetAsClusterAdmin()
     })
 })

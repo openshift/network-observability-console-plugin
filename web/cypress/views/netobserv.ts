@@ -7,6 +7,7 @@ declare global {
         interface Chainable {
             enableFLPMetrics(tag: string[]): Chainable<Element>
             checkStorageClass(context: Mocha.Context): Chainable<Element>
+            checkArchitecture(context: Mocha.Context, supportedArches: string[]): Chainable<Element>
             deployFlowcollectorFromFixture(fixtureFile: string): Chainable<Element>
         }
     }
@@ -33,10 +34,6 @@ type FlowCollectorParameter =
 // Constants
 export const project = "netobserv"
 
-// Environment variables
-const catSrc = Cypress.env('NOO_CATALOG_SOURCE')
-const catSrcImage: string = Cypress.env('NOO_CS_IMAGE')
-
 // Default catalog images
 const DEFAULT_UPSTREAM_IMAGE = 'quay.io/netobserv/network-observability-operator-catalog:v0.0.0-sha-main'
 const DEFAULT_DOWNSTREAM_IMAGE = "quay.io/redhat-user-workloads/ocp-network-observab-tenant/catalog-ystream:latest"
@@ -61,65 +58,40 @@ const FIXTURE_PATHS = {
 } as const
 
 export const Operator = {
-    name: () => {
-        if (`${Cypress.env('NOO_CATALOG_SOURCE')}` === "upstream") {
-            return "NetObserv Operator"
-        }
-        else {
-            return "Network Observability"
-        }
-    },
-    install_catalogsource: () => {
-        let catalogDisplayName = "Production Operators"
-        let catalogImg: string
-        let catalogSource: string
-
-        if (catSrc === "upstream") {
-            catalogImg = catSrcImage ? catSrcImage : DEFAULT_UPSTREAM_IMAGE
-            catalogSource = "netobserv-test"
-            catalogDisplayName = "NetObserv QE"
-            catalogSources.createCustomCatalog(catalogImg, catalogSource, catalogDisplayName)
-        }
-        else {
-            catalogImg = catSrcImage ? catSrcImage : DEFAULT_DOWNSTREAM_IMAGE
-            catalogSource = "netobserv-konflux-fbc"
-            catalogDisplayName = "NetObserv Konflux"
-            catalogSources.createCustomCatalog(catalogImg, catalogSource, catalogDisplayName)
-            // deploy ImageDigetMirrorSet
-            cy.adminCLI('oc apply -f ./cypress/fixtures/image-digest-mirror-set.yaml')
-        }
-        return catalogSource
-    },
     install: () => {
-        if (`${Cypress.env('SKIP_NOO_INSTALL')}` === "true") {
-            return null
-        }
-        // Check operator status via CLI
-        cy.adminCLI('oc get csv -n openshift-netobserv-operator --no-headers -o custom-columns=":metadata.name"',
-            { failOnNonZeroExit: false })
-            .then((result: any) => {
-                const stdout = result.stdout ? result.stdout.trim() : ''
-                const csvName = stdout.split('\n').find((line: string) =>
-                    line.includes('netobserv-operator') || line.includes('network-observability-operator')
-                )
+        cy.env(['SKIP_NOO_INSTALL', 'NOO_CATALOG_SOURCE', 'NOO_CS_IMAGE']).then(({ SKIP_NOO_INSTALL, NOO_CATALOG_SOURCE, NOO_CS_IMAGE }) => {
+            if (SKIP_NOO_INSTALL === "true") {
+                return;
+            }
+            // Check operator status via CLI
+            cy.adminCLI('oc get csv -n openshift-netobserv-operator --no-headers -o custom-columns=":metadata.name"',
+                { failOnNonZeroExit: false })
+                .then((result: any) => {
+                    const stdout = result.stdout ? result.stdout.trim() : ''
+                    const csvName = stdout.split('\n').find((line: string) =>
+                        line.includes('netobserv-operator') || line.includes('network-observability-operator')
+                    )
 
-                if (csvName) {
-                    // CSV exists, check if it's in Succeeded state
-                    cy.adminCLI(`oc wait csv ${csvName.trim()} -n openshift-netobserv-operator --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s`, { timeout: 140000 })
-                        .then(() => {
-                            cy.log('NetObserv Operator already installed')
-                        })
-                } else {
-                    cy.log('Installing NetObserv Operator')
-                    var catalogSource = Operator.install_catalogsource()
-
-                    if (catSrc === "upstream") {
-                        // metrics checkbox is not available for upstream operators
-                        operatorHubPage.install("netobserv-operator", catalogSource, false)
+                    if (csvName) {
+                        // CSV exists, check if it's in Succeeded state
+                        cy.adminCLI(`oc wait csv ${csvName.trim()} -n openshift-netobserv-operator --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s`, { timeout: 140000 })
+                            .then(() => {
+                                cy.log('NetObserv Operator already installed')
+                            })
                     } else {
-                        operatorHubPage.install("netobserv-operator", catalogSource, true)
+                        cy.log('Installing NetObserv Operator')
+                        if (NOO_CATALOG_SOURCE === "upstream") {
+                            catalogSources.createCustomCatalog(NOO_CS_IMAGE || DEFAULT_UPSTREAM_IMAGE, "netobserv-test", "NetObserv QE");
+                            // metrics checkbox is not available for upstream operators
+                            operatorHubPage.install("netobserv-operator", "netobserv-test", false)
+                        } else {
+                            catalogSources.createCustomCatalog(NOO_CS_IMAGE || DEFAULT_DOWNSTREAM_IMAGE, "netobserv-konflux-fbc", "NetObserv Konflux");
+                            // deploy ImageDigetMirrorSet
+                            cy.adminCLI('oc apply -f ./cypress/fixtures/image-digest-mirror-set.yaml');
+                            operatorHubPage.install("netobserv-operator", "netobserv-konflux-fbc", true)
+                        }
                     }
-                }
+            })
         })
     },
     visitFlowcollector: () => {
@@ -397,27 +369,23 @@ export const Operator = {
         cy.get(pluginSelectors.packetDropEnable).should('exist').check()
         cy.get(pluginSelectors.next).should('exist').click()
         // Loki tab — select Monolithic mode, then enable demo Loki.
-        // PF6 Dropdown + Popper can race between menu positioning and click dispatch,
-        // causing the onSelect to silently not fire. Verify the toggle text and retry.
-        const selectMonolithic = (retries = 3): void => {
-            cy.get(pluginSelectors.lokiMode).should('exist').click()
-            cy.get(pluginSelectors.monolithicMode).should('be.visible').click()
-            cy.get(pluginSelectors.lokiMode).then($toggle => {
-                if (!$toggle.text().includes('Monolithic')) {
-                    if (retries > 0) {
-                        cy.log(`Monolithic mode selection did not register, retrying (${retries} retries left)`)
-                        cy.get('body').click(0, 0)
-                        cy.wait(500)
-                        selectMonolithic(retries - 1)
-                    } else {
-                        throw new Error(
-                            `Failed to select Monolithic mode. Toggle text: '${$toggle.text()}'`
-                        )
-                    }
-                }
-            })
-        }
-        selectMonolithic()
+        // Select the actual visible menu item and let PatternFly dispatch its
+        // onSelect handler. Do not force-click an arbitrary duplicate from the
+        // overlay: the toggle text and the dependent field must both update.
+        cy.get(pluginSelectors.lokiMode).should('be.visible').click()
+        cy.get(pluginSelectors.monolithicMode)
+            .filter(':visible')
+            .should('have.length', 1)
+            .click()
+        cy.get(pluginSelectors.lokiMode).should('contain.text', 'Monolithic')
+        // This field is rendered only when the form state is Monolithic. Its
+        // presence verifies that the selection reached the controlled form before
+        // the checkbox is changed.
+        // PatternFly renders the switch input as an opacity-hidden checkbox and
+        // exposes visibility through its surrounding switch control. Assert that
+        // the controlled input exists instead of requiring the input itself to be
+        // visible.
+        cy.get(pluginSelectors.installDemoLoki).should('exist')
         // Enable demo Loki. The switch is a *controlled* component bound to the wizard's
         // form data (SwitchWidget renders isChecked={value}), so if React's onChange does
         // not persist the toggle, the DOM switch is reset to unchecked on the next render.
@@ -426,13 +394,21 @@ export const Operator = {
         // leave the DOM checked while the onChange was swallowed on a busy cluster render.
         // Click only while unchecked (click toggles) and retry until the state sticks.
         const enableDemoLoki = (retries = 4): void => {
+            // PatternFly may put data-test on the switch wrapper or on its input,
+            // depending on the console version. Always interact with the actual
+            // controlled checkbox so React receives the change event.
             cy.get(pluginSelectors.installDemoLoki).should('exist').then($el => {
-                if (!$el.is(':checked')) {
-                    cy.wrap($el).click({ force: true })
+                const input = $el.is('input') ? $el : $el.find('input[type=checkbox]')
+                if (!input.length) {
+                    throw new Error('Demo Loki switch checkbox was not rendered')
+                }
+                if (!input.is(':checked')) {
+                    cy.wrap(input).click({ force: true })
                 }
             })
             cy.get(pluginSelectors.installDemoLoki).then($el => {
-                if (!$el.is(':checked')) {
+                const input = $el.is('input') ? $el : $el.find('input[type=checkbox]')
+                if (!input.is(':checked')) {
                     if (retries > 0) {
                         cy.log(`Demo Loki switch did not stick, retrying (${retries} retries left)`)
                         cy.wait(500)
@@ -446,9 +422,15 @@ export const Operator = {
         enableDemoLoki()
         // Stabilize before leaving the Loki step: a controlled switch that is still checked
         // after a beat means the value persisted into form data and will survive submit.
-        cy.get(pluginSelectors.installDemoLoki).should('be.checked')
+        cy.get(pluginSelectors.installDemoLoki).then($el => {
+            const input = $el.is('input') ? $el : $el.find('input[type=checkbox]')
+            cy.wrap(input).should('be.checked')
+        })
         cy.wait(500)
-        cy.get(pluginSelectors.installDemoLoki).should('be.checked')
+        cy.get(pluginSelectors.installDemoLoki).then($el => {
+            const input = $el.is('input') ? $el : $el.find('input[type=checkbox]')
+            cy.wrap(input).should('be.checked')
+        })
         cy.get(pluginSelectors.next).should('exist').click()
         // Consumption tab — use text-based submit selector (more robust than ID)
         cy.get('footer').contains('button', 'Submit').should('exist').click({ force: true })
@@ -497,16 +479,21 @@ export const Operator = {
         cy.wait(3000)
         verifySubmit()
 
-        // Verify the wizard-created FC actually has installDemoLoki enabled.
-        // If this fails, the wizard checkbox interaction above did not work.
-        cy.adminCLI(
-            'oc get flowcollector cluster -o jsonpath="{.spec.loki.monolithic.installDemoLoki}"',
-            { failOnNonZeroExit: false, timeout: 60000 }
-        ).then((result: Cypress.Exec) => {
-            const val = result.stdout?.replace(/"/g, '').trim() || ''
-            expect(val).to.equal('true',
-                'FlowCollector spec.loki.monolithic.installDemoLoki must be true. ' +
-                'The wizard installDemoLoki checkbox was not properly applied.'
+        // Verify both the selected mode and the dependent checkbox in the object
+        // submitted by the wizard. Checking only installDemoLoki is ambiguous when
+        // the form accidentally submits LokiStack mode, where that field is unused.
+        cy.adminCLI('oc get flowcollector cluster -o json', {
+            failOnNonZeroExit: false,
+            timeout: 60000
+        }).then((result: Cypress.Exec) => {
+            const flowCollector = JSON.parse(result.stdout || '{}')
+            const mode = flowCollector.spec?.loki?.mode
+            const installDemoLoki = flowCollector.spec?.loki?.monolithic?.installDemoLoki
+            expect(mode).to.equal('Monolithic',
+                `FlowCollector spec.loki.mode must be Monolithic, got '${mode || '(empty)'}'`
+            )
+            expect(installDemoLoki).to.equal(true,
+                'FlowCollector spec.loki.monolithic.installDemoLoki must be true'
             )
         })
     },
@@ -519,8 +506,11 @@ export const Operator = {
     uninstall: () => {
         cy.visit('k8s/all-namespaces/operators.coreos.com~v1alpha1~ClusterServiceVersion')
 
-        cy.contains(Operator.name()).should('exist').invoke('attr', 'href').then(href => {
-            cy.visit(href)
+        cy.env(['NOO_CATALOG_SOURCE']).then(({ NOO_CATALOG_SOURCE }) => {
+            const expectedName = (NOO_CATALOG_SOURCE === "upstream") ? "NetObserv Operator" : "Network Observability";
+            cy.contains(expectedName).should('exist').invoke('attr', 'href').then(href => {
+                cy.visit(href)
+            })
         })
         cy.get('.co-actions-menu > .pf-c-dropdown__toggle').should('exist').click()
         cy.byTestActionID('Uninstall Operator').should('exist').click()
@@ -539,15 +529,29 @@ export const Operator = {
 
 Cypress.Commands.add('checkStorageClass', (context: Mocha.Context) => {
     let storageClassCheck = false
-    const kubeconfig = Cypress.env('KUBECONFIG_PATH');
-    expect(kubeconfig, 'KUBECONFIG_PATH').to.be.a('string').and.not.be.empty
-    cy.exec(`oc get sc --kubeconfig ${JSON.stringify(kubeconfig)}`).then(result => {
-        if (result.stderr.includes('No resources found')) {
-            cy.log('StorageClass not deployed, skipping')
-            storageClassCheck = true
-        }
-        cy.wrap(storageClassCheck).then(scCheck => {
-            if (scCheck) {
+    cy.env(['KUBECONFIG_PATH']).then(({ KUBECONFIG_PATH }) => {
+        expect(KUBECONFIG_PATH, 'KUBECONFIG_PATH').to.be.a('string').and.not.be.empty
+        cy.exec(`oc get sc --kubeconfig ${JSON.stringify(KUBECONFIG_PATH)}`).then(result => {
+            if (result.stderr.includes('No resources found')) {
+                cy.log('StorageClass not deployed, skipping')
+                storageClassCheck = true
+            }
+            cy.wrap(storageClassCheck).then(scCheck => {
+                if (scCheck) {
+                    context.skip()
+                }
+            })
+        })
+    })
+});
+
+Cypress.Commands.add('checkArchitecture', (context: Mocha.Context, supportedArches: string[]) => {
+    cy.adminCLI(`oc get nodes -o jsonpath='{.items[*].status.nodeInfo.architecture}'`).then(result => {
+        const arches = Array.from(new Set(result.stdout.trim().split(/\s+/).filter(a => a.length > 0)))
+        const unsupported = arches.filter(a => !supportedArches.includes(a))
+        cy.wrap(unsupported.length > 0).then(skip => {
+            if (skip) {
+                cy.log(`checkArchitecture: node architecture(s) [${arches.join(', ')}] not in supported list [${supportedArches.join(', ')}], skipping`)
                 context.skip()
             }
         })

@@ -4,6 +4,8 @@
 import { nav } from '@views/nav';
 import './console-utilities';
 import './selectors';
+import * as c from './const';
+import { Method } from 'cypress/types/net-stubbing';
 
 /// <reference types="cypress" />
 
@@ -50,8 +52,6 @@ function escapeShellArg(arg: string): string {
 //     }
 //   }
 // }
-
-import * as c from './const';
 
 /**
  * Clears only NetObserv plugin settings. Do not use cy.clearLocalStorage() —
@@ -231,8 +231,7 @@ Cypress.Commands.add('checkRecordField', (field, name, values) => {
   });
 });
 
-
-Cypress.Commands.add('setupNetworkIdleTracking', (method: string = 'GET', urlPattern: string = '/api/**') => {
+Cypress.Commands.add('setupNetworkIdleTracking', (method: Method = 'GET', urlPattern: string = '/api/**') => {
   cy.wrap({
     requestCount: 0,
     lastRequestTime: 0,
@@ -240,7 +239,7 @@ Cypress.Commands.add('setupNetworkIdleTracking', (method: string = 'GET', urlPat
   }).as('networkIdleTracker');
 
   cy.intercept(method, urlPattern, (req) => {
-    cy.get('@networkIdleTracker').then((tracker: Cypress.networkIdleTracker) => {
+    cy.get<Cypress.networkIdleTracker>('@networkIdleTracker').then(tracker => {
       tracker.requestCount++;
       tracker.lastRequestTime = Date.now();
     });
@@ -248,10 +247,9 @@ Cypress.Commands.add('setupNetworkIdleTracking', (method: string = 'GET', urlPat
   }).as('networkIdleActivity');
 });
 
-
 Cypress.Commands.add('waitForNetworkIdle', (idleTime: number = 3000, timeout: number = 120000) => {
-  cy.get('@networkIdleTracker', { timeout: timeout })
-    .then((tracker: Cypress.networkIdleTracker) => {
+  cy.get<Cypress.networkIdleTracker>('@networkIdleTracker', { timeout: timeout })
+    .then(tracker => {
       const startTime = Date.now();
 
       const checkIdleCondition = () => {
@@ -272,7 +270,7 @@ Cypress.Commands.add('waitForNetworkIdle', (idleTime: number = 3000, timeout: nu
         return false;
       };
 
-      const pollUntilIdle = () => {
+      const pollUntilIdle = (): Cypress.Chainable<any> | undefined => {
         const isIdle = checkIdleCondition();
 
         if (isIdle) {
@@ -301,9 +299,24 @@ Cypress.Commands.add("switchPerspective", (perspective: string) => {
 
 // Execute OpenShift CLI commands (from openshift-tests-private/frontend)
 Cypress.Commands.add('adminCLI', (command: string, options?: Partial<Cypress.ExecOptions>) => {
-  const kubeconfig = Cypress.env('KUBECONFIG_PATH');
   cy.log(`Run admin command: ${command}`);
-  return cy.exec(`${command} --kubeconfig ${kubeconfig}`, options);
+  cy.env(['KUBECONFIG_PATH']).then(({ KUBECONFIG_PATH }) => {
+    return cy.exec(`${command} --kubeconfig ${KUBECONFIG_PATH}`, options);
+  });
+});
+
+// Set the LOGIN_USERNAME from env as cluster admin
+Cypress.Commands.add('setAsClusterAdmin', () => {
+  cy.env(['LOGIN_USERNAME']).then(({ LOGIN_USERNAME }) => {
+    cy.adminCLI(`oc adm policy add-cluster-role-to-user cluster-admin ${LOGIN_USERNAME}`);
+  });
+});
+
+// Unset the LOGIN_USERNAME from env as cluster admin
+Cypress.Commands.add('unsetAsClusterAdmin', () => {
+  cy.env(['LOGIN_USERNAME']).then(({ LOGIN_USERNAME }) => {
+    cy.adminCLI(`oc adm policy remove-cluster-role-from-user cluster-admin ${LOGIN_USERNAME}`);
+  });
 });
 
 // to avoid influence from upstream login change
@@ -348,6 +361,13 @@ Cypress.Commands.add('uiLogin', (provider: string, username: string, password: s
   cy.byTestID("username", { timeout: 120000 }).should('be.visible');
 });
 
+// Login using the default user credentials from env
+Cypress.Commands.add('uiLoginDefaultUser', () => {
+  cy.env(['LOGIN_IDP', 'LOGIN_USERNAME', 'LOGIN_PASSWORD']).then(({ LOGIN_IDP, LOGIN_USERNAME, LOGIN_PASSWORD }) => {
+    cy.uiLogin(LOGIN_IDP, LOGIN_USERNAME, LOGIN_PASSWORD);
+  });
+});
+
 Cypress.Commands.add('uiLogout', () => {
   cy.window().then((win: any) => {
     if (win.SERVER_FLAGS?.authDisabled) {
@@ -362,32 +382,33 @@ Cypress.Commands.add('uiLogout', () => {
 });
 
 Cypress.Commands.add("cliLogin", (username?: string, password?: string) => {
-  const kubeconfig = Cypress.env('KUBECONFIG_PATH');
-  const loginUsername = username || Cypress.env('LOGIN_USERNAME');
-  const loginPassword = password || Cypress.env('LOGIN_PASSWORD');
+  cy.env(['KUBECONFIG_PATH', 'LOGIN_USERNAME', 'LOGIN_PASSWORD']).then(({ KUBECONFIG_PATH, LOGIN_USERNAME, LOGIN_PASSWORD }) => {
+    const loginUsername = username || LOGIN_USERNAME;
+    const loginPassword = password || LOGIN_PASSWORD;
 
-  if (!kubeconfig || !loginUsername || !loginPassword) {
-    throw new Error('cliLogin requires KUBECONFIG_PATH, LOGIN_USERNAME, and LOGIN_PASSWORD');
-  }
+    if (!KUBECONFIG_PATH || !loginUsername || !loginPassword) {
+      throw new Error('cliLogin requires KUBECONFIG_PATH, LOGIN_USERNAME, and LOGIN_PASSWORD');
+    }
 
-  cy.exec(`oc whoami --show-server=true --kubeconfig ${escapeShellArg(kubeconfig)}`, { log: false })
-    .then(result => {
-      const hostapi = result.stdout.trim();
-      cy.log(`Server: ${hostapi}`);
-      return cy.exec(
-        `oc login -u ${escapeShellArg(loginUsername)} -p ${escapeShellArg(loginPassword)} ${escapeShellArg(hostapi)} --insecure-skip-tls-verify=true --kubeconfig ${escapeShellArg(kubeconfig)}`,
-        { failOnNonZeroExit: true, log: false }
-      );
-    })
-    .its('code')
-    .should('eq', 0);
+    cy.exec(`oc whoami --show-server=true --kubeconfig ${escapeShellArg(KUBECONFIG_PATH)}`, { log: false })
+      .then(result => {
+        const hostapi = result.stdout.trim();
+        cy.log(`Server: ${hostapi}`);
+        return cy.exec(
+          `oc login -u ${escapeShellArg(loginUsername)} -p ${escapeShellArg(loginPassword)} ${escapeShellArg(hostapi)} --insecure-skip-tls-verify=true --kubeconfig ${escapeShellArg(KUBECONFIG_PATH)}`,
+          { failOnNonZeroExit: true, log: false }
+        );
+      })
+      .its('code')
+      .should('eq', 0);
+  });
 });
 
 Cypress.Commands.add('retryTask', (command, expectedOutput, options?) => {
-  const { retries, interval } = options || DEFAULT_RETRY_OPTIONS;
-  const retryTaskFn = (currentRetries) => {
+  const { retries, interval } = options || c.DEFAULT_RETRY_OPTIONS;
+  const retryTaskFn = (currentRetries: number) => {
     return cy.adminCLI(command)
-      .then(result => {
+      .then((result: Cypress.Exec): Cypress.Chainable<boolean> => {
         if (result.stdout.includes(expectedOutput)) {
           return cy.wrap(true);
         } else if (currentRetries < retries) {
@@ -413,6 +434,11 @@ Cypress.Commands.add("checkCommandResult", (command, expectedoutput, options?) =
 
 declare global {
   namespace Cypress {
+    interface networkIdleTracker {
+      requestCount: number;
+      lastRequestTime: number;
+      startTime: number;
+    }
     interface Chainable {
       openNetflowTrafficPage(clearCache?: boolean): Chainable<void>
       openNetworkHealthPage(clearCache?: boolean): Chainable<void>
@@ -434,16 +460,16 @@ declare global {
       checkRecordField(field: string, name: string, values: string[]): Chainable<void>
       clickShowDuplicates(): Chainable<void>
       adminCLI(command: string, options?: Partial<Cypress.ExecOptions>): Chainable<Cypress.Exec>
+      setAsClusterAdmin(): Chainable<Cypress.Exec>
+      unsetAsClusterAdmin(): Chainable<Cypress.Exec>
       clearNetobservLocalStorage(): Chainable<void>
       uiLogin(provider: string, username: string, password: string): Chainable<void>
+      uiLoginDefaultUser(): Chainable<void>
       uiLogout(): Chainable<void>
       cliLogin(username?: string, password?: string): Chainable<void>
       switchPerspective(perspective: string): Chainable<void>
-      checkCommandResult(command: string, expectedoutput: string, options?: { retries?: number; interval?: number }): Chainable<void>
-      retryTask(condition: string, expectedoutput: string, options?: { retries?: number; interval?: number }): Chainable<void>
-
-
-
+      checkCommandResult(command: string, expectedoutput: string, options?: { retries: number; interval: number }): Chainable<boolean>
+      retryTask(condition: string, expectedoutput: string, options?: { retries: number; interval: number }): Chainable<boolean>
 
       /**
        * Sets up network interception to track active requests for idle detection.
@@ -452,7 +478,7 @@ declare global {
        * @param method HTTP method to intercept (default: 'GET')
        * @param urlPattern URL pattern to intercept (default: '/api/**')
        */
-      setupNetworkIdleTracking(method?: string, urlPattern?: string): Chainable<void>
+      setupNetworkIdleTracking(method?: Method, urlPattern?: string): Chainable<void>
 
       /**
        * Waits until no intercepted requests (matching the patterns
@@ -463,12 +489,6 @@ declare global {
        * @param timeout Total time to wait before timing out (in ms)
        */
       waitForNetworkIdle(idleTime?: number, timeout?: number): Chainable<void>
-
-      networkIdleTracker: {
-        requestCount: number;
-        lastRequestTime: number;
-        startTime: number;
-      };
     }
   }
 }

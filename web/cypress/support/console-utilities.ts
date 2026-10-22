@@ -11,6 +11,7 @@ declare global {
         options?: Partial<Cypress.VisitOptions>,
         selector?: string,
       ): Chainable<Element>;
+      clickNavLink(path: string[]): Chainable<Element>;
       dismissWelcomeModal(): Chainable<Element>;
     }
   }
@@ -75,15 +76,18 @@ Cypress.Commands.add('dismissWelcomeModal', () => {
       for (let i = 0; i < $modals.length; i++) {
         const $modal = Cypress.$($modals[i]);
         const ariaLabel = $modal.attr('aria-label') || '';
+        const modalText = $modal.text();
         const isVisible = $modal.is(':visible');
+        const isWelcome = ariaLabel.toLowerCase().includes('welcome') ||
+          modalText.includes('Welcome to OpenShift Virtualization');
 
-        if (isVisible && ariaLabel.toLowerCase().includes('welcome')) {
+        if (isVisible && isWelcome) {
           foundWelcome = true;
 
           // Find close button
           let $closeBtn = $modal.find('button[aria-label="Close"]');
           if ($closeBtn.length === 0) {
-            $closeBtn = $modal.find('.pf-c-modal-box__close');
+            $closeBtn = $modal.find('.pf-c-modal-box__close, .pf-v6-c-modal-box__close');
           }
 
           if ($closeBtn.length > 0) {
@@ -143,13 +147,3 @@ export const editKind = (kind: string, humanizeKind: boolean) =>
 
 export const deleteKind = (kind: string, humanizeKind: boolean) =>
   actionOnKind(actions.delete, kind, humanizeKind);
-
-export const create = (obj) => {
-  const filename = [
-    Cypress.config('screenshotsFolder').toString().replace('/cypress/screenshots', ''),
-    `${obj.metadata.name}.${obj.kind.toLowerCase()}.json`,
-  ].join('/');
-  cy.writeFile(filename, JSON.stringify(obj));
-  cy.exec(`oc create -f ${filename}`);
-  cy.exec(`rm ${filename}`);
-};
