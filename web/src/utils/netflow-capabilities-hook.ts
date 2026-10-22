@@ -22,6 +22,7 @@ import {
   rttIdMatcher,
   tlsIdMatcher
 } from './overview-panels';
+import { isScopeAvailable } from './scopes';
 
 export interface ConfigCapabilities {
   allowLoki: boolean;
@@ -120,16 +121,8 @@ export function useConfigCapabilities(params: {
   // Derived collections
   const availableScopes = React.useMemo(
     () =>
-      config.scopes.filter(sc => {
-        if (sc.feature) {
-          return config.features.includes(sc.feature);
-        }
-        if (isPromOnly) {
-          return sc.labels.every(label => config.promLabels.includes(label));
-        }
-        return true;
-      }),
-    [config.scopes, config.features, config.promLabels, isPromOnly]
+      config.scopes.filter(sc => isScopeAvailable(sc, config.features, config.promLabels, config.columns, isPromOnly)),
+    [config.scopes, config.features, config.promLabels, config.columns, isPromOnly]
   );
 
   React.useEffect(() => {
@@ -187,7 +180,7 @@ export function useConfigCapabilities(params: {
         });
       }
     }
-    // "All Traffic": user's manual selection + generic prefs override
+    // "Default": user's manual selection + generic prefs override
     return availablePanels.filter(panel => {
       const isGeneric = !getPanelFeature(panel.id);
       if (isGeneric) {
@@ -230,7 +223,7 @@ export function useConfigCapabilities(params: {
         });
       }
     }
-    // "All Traffic": user's manual selection + generic prefs override
+    // "Default": user's manual selection + generic prefs override
     return availableColumns.filter(col => {
       const isGeneric = !col.feature;
       if (isGeneric) {

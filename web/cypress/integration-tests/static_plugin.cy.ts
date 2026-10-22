@@ -41,7 +41,7 @@ describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['
 
         // Verify "Open Network Traffic page" button is enabled when FC is ready
         cy.byLegacyTestID('open-network-traffic').should('exist')
-            .should('not.have.attr', 'aria-disabled', 'true')
+            .should('have.attr', 'aria-disabled', 'false')
 
         // Verify demoloki install warning alert at top of status page
         cy.get(flowcollectorStatusSelectors.configIssueRow).should('exist')
@@ -74,7 +74,13 @@ describe('(OCP-84156 OCP-88744) StaticPlugin test with Status Check', { tags: ['
         cy.get(flowcollectorStatusSelectors.readyRow, { timeout: 60000 }).should('exist')
             .should('have.attr', 'data-test-status', 'True')
             .should('have.attr', 'data-test-reason', 'Ready')
-        cy.get(pluginSelectors.openNetworkTraffic).click()
+        // The button guards navigation while the status page is still catching up
+        // with the operator. Require the explicit enabled state before clicking;
+        // checking only that aria-disabled is not "true" also accepts a missing
+        // attribute and can turn the click into a no-op.
+        cy.get(pluginSelectors.openNetworkTraffic, { timeout: 60000 })
+            .should('have.attr', 'aria-disabled', 'false')
+            .click()
 
         // Wait for Network Traffic page to fully load after navigation
         cy.url({ timeout: 30000 }).should('include', '/netflow-traffic')
