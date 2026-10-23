@@ -19,7 +19,7 @@ WORKDIR /opt/app-root/web
 RUN TRANSPILE_ONLY=true npm run build
 RUN TRANSPILE_ONLY=true npm run build:static
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.26 as go-builder
+FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9 as go-builder
 
 ARG BUILDVERSION
 
