@@ -27,6 +27,8 @@
   },
   "dockerfile": {
     "ignorePaths": [
+      "Dockerfile.front",
+      "Dockerfile.ci",
       "Dockerfile.cypress",
       "Dockerfile.e2e",
       "vendor/**"
