@@ -54,7 +54,7 @@
     "@types/react-dom": "^18.3.0",
     "@types/react-transition-group": "^4.4.4",
     "@typescript-eslint/eslint-plugin": "^8.69.0",
-    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/parser": "^8.72.1",
     "@typescript-eslint/typescript-estree": "^8.71.0",
     "ajv": "^8.20.0",
     "babel-loader": "^10.0.0",
@@ -89,7 +89,7 @@
     "ts-loader": "9.5.4",
     "ts-node": "10.9.2",
     "typescript": "^5.9.3",
-    "webpack": "^5.111.1",
+    "webpack": "^5.112.2",
     "webpack-cli": "^7.2.3",
     "webpack-dev-server": "^5.2.6",
     "webpack-node-externals": "3.0.0"
